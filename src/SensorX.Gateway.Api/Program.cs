@@ -1,0 +1,198 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Formatting.Compact;
+using SensorX.Gateway.Api.Authorization;
+using SensorX.Gateway.Api.HealthChecks;
+using SensorX.Gateway.Domain.Interfaces;
+using SensorX.Gateway.Infrastructure;
+using SensorX.Gateway.Infrastructure.Persistence;
+using SensorX.Gateway.Infrastructure.Services;
+using SensorX.Gateway.Api.Middleware;
+using SensorX.Gateway.Api.ReverseProxy;
+
+// ═══════════════════════════════════════════════════════════════
+//  SensorX API Gateway + Identity Provider
+// ═══════════════════════════════════════════════════════════════
+
+var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine(builder.Environment.IsDevelopment() ? "Running in Development mode" : "Running in Production mode");
+// ── Serilog ──
+builder.Host.UseSerilog((ctx, config) => config
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Service", "sensorx-gateway")
+    .WriteTo.Console(new CompactJsonFormatter()));
+
+// ── Infrastructure layer (DB, Redis, services) ──
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// ── Authentication (JWT RS256) ──
+var keyManager = new KeyManagementService(builder.Configuration);
+builder.Services.AddSingleton(keyManager);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "https://gateway.yourdomain.com",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["JwtSettings:Audience"] ?? "api",
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKeyResolver = keyManager.ResolveSigningKey,
+            ClockSkew = TimeSpan.Zero
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var jti = context.Principal?.FindFirst("jti")?.Value;
+                if (jti != null)
+                {
+                    var blacklistService = context.HttpContext.RequestServices
+                        .GetRequiredService<ITokenBlacklistService>();
+                    if (await blacklistService.IsBlacklistedAsync(jti))
+                    {
+                        context.Fail("Token has been revoked");
+                    }
+                }
+            }
+        };
+    });
+
+// ── Authorization (Redis-based permissions) ──
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddAuthorization();
+
+// ── CORS ──
+builder.Services.AddCors(options =>
+    options.AddPolicy("Production", policy =>
+        policy.WithOrigins(
+                builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? new[] { "https://app.yourdomain.com", "https://admin.yourdomain.com" })
+            .WithMethods("GET", "POST", "PUT", "DELETE")
+            .AllowCredentials()
+            .AllowAnyHeader()));
+
+// ── ForwardedHeaders (behind Nginx) ──
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+// ── YARP Reverse Proxy ──
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddGatewayTransforms();
+
+// ── Health Checks ──
+builder.Services.AddGatewayHealthChecks();
+
+// ── OpenTelemetry (Tracing + Metrics + Prometheus) ──
+var otelSettings = builder.Configuration.GetSection("OpenTelemetry");
+var otlpEndpoint = otelSettings["OtlpEndpoint"];
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: otelSettings["ServiceName"] ?? "sensorx-gateway",
+            serviceVersion: "1.0.0")
+        .AddAttributes(new Dictionary<string, object>
+        {
+            ["deployment.environment"] = builder.Environment.EnvironmentName.ToLower()
+        }))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation(opts =>
+            {
+                opts.RecordException = true;
+                // bỏ qua scraping endpoint của Prometheus khỏi traces
+                opts.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/metrics");
+            })
+            .AddHttpClientInstrumentation(opts => opts.RecordException = true);
+
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddPrometheusExporter();
+    });
+
+// ── Controllers ──
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddOpenApiDocument(config =>
+{
+    config.DocumentName = "v1";
+    config.Title = "SensorX Gateway API";
+    config.Version = "v1";
+    config.AddSecurity("Bearer", new NSwag.OpenApiSecurityScheme
+    {
+        Type = NSwag.OpenApiSecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Nhập JWT token (không cần prefix 'Bearer ')"
+    });
+    config.OperationProcessors.Add(
+        new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
+});
+
+var app = builder.Build();
+
+// ═══════════════════════════════════════════════════════════════
+//  Middleware Pipeline 
+// ═══════════════════════════════════════════════════════════════
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseOpenApi();
+    app.UseSwaggerUi();
+
+
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.EnsureCreatedAsync();
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not create database schema. Ensure the database is running.");
+    }
+}
+
+
+app.UseForwardedHeaders();          // [1] Resolve real IP from Nginx
+app.UseExceptionHandling();         // [2] Catch all exceptions → standard error
+app.UseSecurityHeaders();           // [3] HSTS, CSP, X-Frame-Options
+app.UseCors("Production");          // [4] CORS check before auth
+app.UseAuthentication();            // [5] Validate JWT signature + claims
+app.UseAuthorization();             // [6] Check role/scope → 403 if denied
+app.UseCorrelationId();             // [7] Inject X-Correlation-Id
+app.UseAuditLogging();              // [8] Log AFTER auth (has userId)
+
+// ── Endpoints ──
+app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapPrometheusScrapingEndpoint("/metrics"); // [10] Prometheus scrape
+app.MapReverseProxy();              // [9] YARP forward request
+
+
+
+app.Run();

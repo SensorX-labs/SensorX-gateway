@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <!-- xUnit.net configuration file -->
+  <!-- Set to 'true' to parallelize test collections -->
+  <!-- Useful for running independent tests in parallel -->
+</configuration>

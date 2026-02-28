@@ -1,0 +1,24 @@
+# SensorX Gateway
+
+## Build & IDE
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+*.csproj.user
+
+## RSA Keys — NEVER commit to source control
+Keys/private.key
+
+## Environment
+.env
+appsettings.*.local.json
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Docker
+docker-compose.override.yml

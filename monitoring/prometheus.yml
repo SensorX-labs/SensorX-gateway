@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    project: sensorx
+
+scrape_configs:
+  - job_name: sensorx-gateway
+    # Scrape /metrics endpoint của gateway (chạy trong Docker nội bộ dùng host gateway)
+    # Khi deploy qua docker-compose, thay bằng tên service, vd: sensorx-gateway:8080
+    static_configs:
+      - targets:
+          - host.docker.internal:5000
+    metrics_path: /metrics
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
