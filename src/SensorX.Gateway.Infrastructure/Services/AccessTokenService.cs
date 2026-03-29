@@ -15,12 +15,15 @@ public class AccessTokenService : IAccessTokenService
 
     public string CreateToken(Guid userId, string email, string role, string scope)
     {
+        var username = email.Split('@')[0];
         var claims = new List<Claim>
         {
             new("sub", userId.ToString()),
+            new("name", username),
+            new("unique_name", username),
+            new("email", email),
             new("role", role),
-            new("scope", scope),
-            new(ClaimTypes.Email, email)
+            new("scope", scope)
         };
         return _jwtService.Sign(claims);
     }

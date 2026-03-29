@@ -43,13 +43,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "https://gateway.yourdomain.com",
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "https://gateway.sensorx.com",
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["JwtSettings:Audience"] ?? "api",
+            ValidAudience = builder.Configuration["JwtSettings:Audience"] ?? "SensorX.Warehouse.Api",
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeyResolver = keyManager.ResolveSigningKey,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = "name",
+            RoleClaimType = "role"
         };
         options.Events = new JwtBearerEvents
         {
