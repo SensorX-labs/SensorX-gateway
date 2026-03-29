@@ -22,3 +22,8 @@ Thumbs.db
 
 ## Docker
 docker-compose.override.yml
+
+## SSL / Let's Encrypt (managed by Traefik at runtime)
+letsencrypt/
+traefik/acme.json
+*.pem

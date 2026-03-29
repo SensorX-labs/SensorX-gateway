@@ -1,43 +1,149 @@
 version: "3.8"
 
+# ── Shared overlay network (all services routing through Traefik) ──
+networks:
+  proxy:
+    name: proxy
+  internal:
+    internal: true
+
 services:
+
+  # ══════════════════════════════════════════════════════════════
+  #  Traefik — Edge Router + Automatic SSL (Let's Encrypt)
+  #  Subdomains:
+  #    api.${DOMAIN}        → sensorx-gateway   (public)
+  #    grafana.${DOMAIN}    → grafana            (public, auth via Grafana)
+  #    traefik.${DOMAIN}    → Traefik dashboard  (protected, internal)
+  #    prometheus.${DOMAIN} → prometheus         (protected, internal)
+  # ══════════════════════════════════════════════════════════════
+  traefik:
+    image: traefik:v3.2
+    container_name: sensorx-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - letsencryptdata:/letsencrypt
+      - traefik_logs:/var/log/traefik
+    networks:
+      - proxy
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL}
+      - TRAEFIK_DASHBOARD_USER=${TRAEFIK_DASHBOARD_USER}
+      - TRAEFIK_DASHBOARD_PASSWORD_HASH=${TRAEFIK_DASHBOARD_PASSWORD_HASH}
+    labels:
+      - "traefik.enable=true"
+      # Dashboard router
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth@file,internal-only@file"
+
+  # ══════════════════════════════════════════════════════════════
+  #  SensorX API Gateway
+  # ══════════════════════════════════════════════════════════════
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sensorx-gateway:latest
+    container_name: sensorx-gateway
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=sensorx_gateway;Username=postgres;Password=${POSTGRES_PASSWORD}
+      - Redis__ConnectionString=redis:6379
+      - JwtSettings__Issuer=https://api.${DOMAIN}
+      - JwtSettings__Audience=api
+      - JwtSettings__PrivateKeyPath=/run/secrets/jwt_private_key
+      - JwtSettings__HmacSecret=${JWT_HMAC_SECRET}
+    secrets:
+      - jwt_private_key
+    volumes:
+      - gateway_keys:/app/Keys
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # HTTPS router
+      - "traefik.http.routers.gateway.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.gateway.entrypoints=websecure"
+      - "traefik.http.routers.gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.gateway.middlewares=rate-limit@file,compress@file"
+      - "traefik.http.routers.gateway.service=gateway-svc"
+      # Apply stricter rate limit on /auth/* routes
+      - "traefik.http.routers.gateway-auth.rule=Host(`api.${DOMAIN}`) && PathPrefix(`/auth`)"
+      - "traefik.http.routers.gateway-auth.entrypoints=websecure"
+      - "traefik.http.routers.gateway-auth.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.gateway-auth.middlewares=auth-rate-limit@file,compress@file"
+      - "traefik.http.routers.gateway-auth.service=gateway-svc"
+      - "traefik.http.routers.gateway-auth.priority=20"
+      # Service
+      - "traefik.http.services.gateway-svc.loadbalancer.server.port=8080"
+      - "traefik.http.services.gateway-svc.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.gateway-svc.loadbalancer.healthcheck.interval=15s"
+
+  # ══════════════════════════════════════════════════════════════
+  #  PostgreSQL
+  # ══════════════════════════════════════════════════════════════
   postgres:
     image: postgres:16
     container_name: sensorx-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: sensorx_gateway
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # ══════════════════════════════════════════════════════════════
+  #  Redis
+  # ══════════════════════════════════════════════════════════════
   redis:
     image: redis:7-alpine
     container_name: sensorx-redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
     volumes:
       - redisdata:/data
+    networks:
+      - internal
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # ── Observability Stack ─────────────────────────────────────────
-
+  # ══════════════════════════════════════════════════════════════
+  #  Observability Stack
+  # ══════════════════════════════════════════════════════════════
   prometheus:
     image: prom/prometheus:v2.52.0
     container_name: sensorx-prometheus
-    ports:
-      - "9090:9090"
+    restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheusdata:/prometheus
@@ -46,26 +152,53 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
-    restart: unless-stopped
+    networks:
+      - proxy
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus.middlewares=dashboard-auth@file,internal-only@file"
+      - "traefik.http.services.prometheus-svc.loadbalancer.server.port=9090"
 
   grafana:
     image: grafana/grafana:11.1.0
     container_name: sensorx-grafana
-    ports:
-      - "3000:3000"
+    restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://grafana.${DOMAIN}"
+      GF_SERVER_DOMAIN: "grafana.${DOMAIN}"
     volumes:
       - grafanadata:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - proxy
+      - internal
     depends_on:
       - prometheus
-    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana-svc.loadbalancer.server.port=3000"
+
+secrets:
+  jwt_private_key:
+    file: ./src/SensorX.Gateway.Api/Keys/private.key
 
 volumes:
   pgdata:
   redisdata:
   prometheusdata:
   grafanadata:
+  letsencryptdata:
+  traefik_logs:
+  gateway_keys:

@@ -299,6 +299,132 @@ Test suite dùng **xUnit** + **FluentAssertions**, bao gồm integration test ch
 
 ---
 
+---
+
+## SSL tự động & Subdomain (Traefik)
+
+Hệ thống tích hợp **Traefik v3** làm edge router, tự động cấp và gia hạn chứng chỉ SSL qua **Let's Encrypt** mà không cần cấu hình manual.
+
+### Subdomain layout
+
+| Subdomain | Service | Quyền truy cập |
+|---|---|---|
+| `api.yourdomain.com` | SensorX Gateway | Public |
+| `grafana.yourdomain.com` | Grafana | Public (auth Grafana) |
+| `traefik.yourdomain.com` | Traefik Dashboard | Internal + Basic Auth |
+| `prometheus.yourdomain.com` | Prometheus | Internal + Basic Auth |
+
+### Cách hoạt động
+
+```
+Internet
+   │  :80/:443
+   ▼
+Traefik (edge router)
+   ├── Let's Encrypt ACME TLS-ALPN-01 → cấp cert tự động
+   ├── HTTP → HTTPS redirect
+   ├── api.domain.com:443     → gateway:8080   (rate-limited)
+   ├── grafana.domain.com:443 → grafana:3000
+   ├── prometheus.domain.com  → prometheus:9090 (IP whitelist + basic auth)
+   └── traefik.domain.com     → dashboard       (basic auth)
+```
+
+Traefik đọc cấu hình từ **Docker labels** trực tiếp — không cần reload khi thêm service mới.
+
+### Deploy production với Traefik
+
+**1. Cấu hình DNS** — Tạo A record cho tất cả subdomain trỏ về IP server:
+```
+api.yourdomain.com        A  <SERVER_IP>
+grafana.yourdomain.com    A  <SERVER_IP>
+traefik.yourdomain.com    A  <SERVER_IP>
+prometheus.yourdomain.com A  <SERVER_IP>
+```
+
+**2. Tạo RSA key** (nếu chưa có):
+```bash
+dotnet run --project src/SensorX.KeyGen -- src/SensorX.Gateway.Api/Keys
+```
+
+**3. Tạo file `.env`** từ template:
+```bash
+cp .env.example .env
+```
+Điền `DOMAIN`, `ACME_EMAIL`, password hash (xem hướng dẫn trong file).
+
+Tạo password hash cho Traefik dashboard:
+```bash
+echo $(htpasswd -nb admin yourpassword) | sed -e 's/\$/\$\$/g'
+```
+
+**4. Khởi động:**
+```bash
+docker compose up -d
+```
+
+Traefik sẽ tự động:
+- Cấp SSL cho tất cả subdomain ngay lần đầu khởi động
+- Tự gia hạn cert trước khi hết hạn 30 ngày
+- Forward request đến đúng service
+
+### Phương án thay thế: Nginx + Certbot
+
+Dùng `docker-compose.nginx.yml` nếu bạn muốn kiểm soát Nginx trực tiếp.
+
+**Lần đầu — issue certs:**
+```bash
+# Khởi động nginx tạm với port 80 để Certbot xác thực HTTP-01
+docker compose -f docker-compose.nginx.yml run --rm certbot-init
+```
+
+**Chạy bình thường:**
+```bash
+docker compose -f docker-compose.nginx.yml up -d
+```
+
+**Gia hạn cert (đặt cron job, chạy hàng tuần):**
+```bash
+0 0 * * 0 /path/to/nginx/ssl-renew.sh
+```
+
+Config nginx nằm tại [nginx/conf.d/default.conf](nginx/conf.d/default.conf) — thay `yourdomain.com` bằng domain thực tế.
+
+### Cấu trúc file mới
+
+```
+SensorX-gateway/
+├── Dockerfile                    # Multi-stage build cho gateway
+├── docker-compose.yml            # Production stack (Traefik)
+├── docker-compose.dev.yml        # Dev override (no Traefik, direct ports)
+├── docker-compose.nginx.yml      # Alternative: Nginx + Certbot
+├── .env.example                  # Template biến môi trường
+├── traefik/
+│   ├── traefik.yml               # Static config (entrypoints, ACME, providers)
+│   └── dynamic/
+│       ├── middlewares.yml       # Rate limit, auth, security headers
+│       └── tls.yml               # TLS options (cipher suites)
+└── nginx/
+    ├── nginx.conf                # Nginx main config
+    ├── conf.d/default.conf       # Virtual hosts + SSL
+    └── ssl-renew.sh              # Cert renewal script
+```
+
+---
+
+## Local Development
+
+```bash
+# Chạy infrastructure (DB, Redis, Prometheus, Grafana) + gateway (dev mode)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Gateway chạy tại http://localhost:5053
+# Swagger UI: http://localhost:5053/swagger
+# Grafana:    http://localhost:3000
+# Prometheus: http://localhost:9090
+```
+
+---
+
 ## License
 
 MIT

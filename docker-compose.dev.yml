@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────
+#  docker-compose.dev.yml — Local Development Override
+#  Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#  Replaces Traefik with direct port bindings for local dev.
+#  No SSL, no subdomain needed.
+# ─────────────────────────────────────────────────────────────────
+
+version: "3.8"
+
+services:
+  # Disable Traefik in dev
+  traefik:
+    profiles:
+      - production
+
+  # Gateway — dev mode with hot-reload via source mount
+  gateway:
+    build:
+      target: build        # Stop at build stage so SDK is available
+    image: sensorx-gateway:dev
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=sensorx_gateway;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - JwtSettings__Issuer=http://localhost:5053
+      - JwtSettings__PrivateKeyPath=Keys/private.key
+      - JwtSettings__HmacSecret=dev-secret-not-for-production
+    volumes:
+      - ./src:/src                                     # Source for dotnet watch
+      - ./src/SensorX.Gateway.Api/Keys:/app/Keys       # RSA keys
+    ports:
+      - "5053:8080"
+    secrets: []            # Remove Docker Secrets requirement in dev
+    command: ["dotnet", "watch", "--project", "SensorX.Gateway.Api/SensorX.Gateway.Api.csproj", "run"]
+    working_dir: /src
+
+  # Expose DB and Redis locally for tooling (TablePlus, RedisInsight, etc.)
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+
+  redis:
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes   # No auth in dev
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_ROOT_URL: "http://localhost:3000"
+      GF_SERVER_DOMAIN: "localhost"

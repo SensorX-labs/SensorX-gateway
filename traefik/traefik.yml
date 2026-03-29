@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────────
+#  Traefik v3 — Static Configuration
+#  File: traefik/traefik.yml
+# ─────────────────────────────────────────────────────────────────
+
+# API Dashboard (accessible at traefik.yourdomain.com)
+api:
+  dashboard: true
+  insecure: false
+
+# Logging
+log:
+  level: INFO
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
+
+# Entry Points
+entryPoints:
+  # HTTP — auto-redirect to HTTPS
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  # HTTPS
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - secure-headers@file
+
+# Let's Encrypt (ACME)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # !! Replace with your email !!
+      email: "${ACME_EMAIL}"
+      storage: /letsencrypt/acme.json
+      # TLS-ALPN-01 challenge — works on port 443, no HTTP needed
+      tlsChallenge: {}
+      # Uncomment for staging (testing) — avoids rate limits
+      # caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+# Providers
+providers:
+  # Docker provider — reads labels from containers
+  docker:
+    exposedByDefault: false
+    network: proxy
+  # File provider — dynamic middlewares, TLS options, etc.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# Metrics (scraped by existing Prometheus config)
+metrics:
+  prometheus:
+    entryPoint: websecure
+    addEntryPointsLabels: true
+    addServicesLabels: true

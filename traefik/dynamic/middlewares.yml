@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────
+#  Traefik v3 — Dynamic Configuration
+#  File: traefik/dynamic/middlewares.yml
+#  Hot-reloaded by Traefik without restart.
+# ─────────────────────────────────────────────────────────────────
+
+http:
+  middlewares:
+
+    # ── Security Headers ──────────────────────────────────────────
+    secure-headers:
+      headers:
+        sslRedirect: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # ── Basic Auth (Traefik dashboard + Prometheus) ───────────────
+    # Generate password: echo $(htpasswd -nb admin yourpassword) | sed -e s/\\$/\\$\\$/g
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_PASSWORD_HASH}"
+
+    # ── Rate Limiting ─────────────────────────────────────────────
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+
+    # ── Auth API Rate Limiting (stricter) ─────────────────────────
+    auth-rate-limit:
+      rateLimit:
+        average: 20
+        burst: 10
+        period: 1m
+
+    # ── IP Whitelist for internal services ────────────────────────
+    internal-only:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
+    # ── Compress responses ────────────────────────────────────────
+    compress:
+      compress: {}
+
+    # ── Redirect www → apex ───────────────────────────────────────
+    www-to-apex:
+      redirectRegex:
+        regex: "^https?://www\\.(.+)"
+        replacement: "https://${1}"
+        permanent: true
