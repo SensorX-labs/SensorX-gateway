@@ -228,6 +228,31 @@ public class AuthControllerTests
         result.Should().BeOfType<OkObjectResult>();
     }
 
+    [Fact]
+    public async Task Login_WhenSuccessful_CallsAccessTokenServiceWithCorrectParams()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var email = "test@example.com";
+        var password = "password123";
+        var roleId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId, Email = email, PasswordHash = "hash",
+            UserRoles = new List<UserRole> { 
+                new UserRole { Role = new Role { Id = roleId, Name = "admin" } } 
+            }
+        };
+        _seedUsers(user);
+        _mockPasswordHasher.Setup(x => x.VerifyAsync(password, It.IsAny<string>())).ReturnsAsync(true);
+        
+        // Act
+        await _controller.Login(new LoginRequest(email, password));
+
+        // Assert
+        _mockAccessTokenService.Verify(x => x.CreateToken(userId, email, "admin", "admin"), Times.Once);
+    }
+
     #endregion
 
     #region Register Tests
