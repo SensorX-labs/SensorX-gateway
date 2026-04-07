@@ -1,45 +1,29 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using Moq;
-using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Infrastructure.Services;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Xunit;
 
 namespace SensorX.Gateway.Test.Services;
 
 public class JwtServiceTests
 {
-    private readonly Mock<IKeyManagementService> _mockKeyManager;
     private readonly IConfiguration _configuration;
-    private readonly RsaSecurityKey _testSigningKey;
-    private readonly string _kid = "test-key-id";
     private readonly JwtService _service;
 
     public JwtServiceTests()
     {
-        var rsa = RSA.Create(2048);
-        _testSigningKey = new RsaSecurityKey(rsa) { KeyId = _kid };
-
-        _mockKeyManager = new Mock<IKeyManagementService>();
-        _mockKeyManager.Setup(x => x.GetSigningCredentials())
-            .Returns(new SigningCredentials(_testSigningKey, SecurityAlgorithms.RsaSha256));
-        _mockKeyManager.Setup(x => x.GetKid()).Returns(_kid);
-        _mockKeyManager.Setup(x => x.ResolveSigningKey(It.IsAny<string>(), It.IsAny<SecurityToken>(), It.IsAny<string>(), It.IsAny<TokenValidationParameters>()))
-            .Returns(new[] { _testSigningKey });
-
         _configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["JwtSettings:Issuer"] = "https://test-issuer.com",
                 ["JwtSettings:Audience"] = "test-audience",
-                ["JwtSettings:AccessTokenMinutes"] = "15"
+                ["JwtSettings:AccessTokenMinutes"] = "15",
+                ["JwtSettings:HmacSecret"] = "test-secret-key-must-be-long-enough-32-chars-long"
             })
             .Build();
 
-        _service = new JwtService(_mockKeyManager.Object, _configuration);
+        _service = new JwtService(_configuration);
     }
 
     [Fact]
@@ -68,7 +52,7 @@ public class JwtServiceTests
 
         // Assert
         principal.Should().NotBeNull();
-        principal.FindFirst("sub")?.Value.Should().Be("user-123");
+        principal!.FindFirst("sub")?.Value.Should().Be("user-123");
         principal.FindFirst("role")?.Value.Should().Be("admin");
         principal.FindFirst("iss")?.Value.Should().Be("https://test-issuer.com");
         principal.FindFirst("aud")?.Value.Should().Be("test-audience");

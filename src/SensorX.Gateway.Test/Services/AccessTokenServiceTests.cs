@@ -29,7 +29,7 @@ public class AccessTokenServiceTests
         var scope = "api.read api.write";
         var expectedToken = "signed_jwt_token";
 
-        IEnumerable<Claim> capturedClaims = null;
+        IEnumerable<Claim>? capturedClaims = null;
         _mockJwtService.Setup(x => x.Sign(It.IsAny<IEnumerable<Claim>>(), It.IsAny<int?>()))
             .Callback<IEnumerable<Claim>, int?>((claims, _) => capturedClaims = claims)
             .Returns(expectedToken);
@@ -41,7 +41,7 @@ public class AccessTokenServiceTests
         result.Should().Be(expectedToken);
         capturedClaims.Should().NotBeNull();
         
-        var claimsDict = capturedClaims.ToDictionary(c => c.Type, c => c.Value);
+        var claimsDict = capturedClaims!.ToDictionary(c => c.Type, c => c.Value);
         
         claimsDict["sub"].Should().Be(userId.ToString());
         claimsDict["name"].Should().Be("john.doe");
@@ -49,35 +49,5 @@ public class AccessTokenServiceTests
         claimsDict["email"].Should().Be(email);
         claimsDict["role"].Should().Be(role);
         claimsDict["scope"].Should().Be(scope);
-    }
-
-    [Fact]
-    public void CreateMfaToken_ShouldBuildMfaClaims()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var expectedToken = "mfa_token";
-        
-        IEnumerable<Claim> capturedClaims = null;
-        int? capturedExpireMinutes = null;
-        
-        _mockJwtService.Setup(x => x.Sign(It.IsAny<IEnumerable<Claim>>(), It.IsAny<int?>()))
-            .Callback<IEnumerable<Claim>, int?>((claims, exp) => 
-            {
-                capturedClaims = claims;
-                capturedExpireMinutes = exp;
-            })
-            .Returns(expectedToken);
-
-        // Act
-        var result = _service.CreateMfaToken(userId);
-
-        // Assert
-        result.Should().Be(expectedToken);
-        capturedExpireMinutes.Should().Be(5);
-        
-        var claimsDict = capturedClaims.ToDictionary(c => c.Type, c => c.Value);
-        claimsDict["sub"].Should().Be(userId.ToString());
-        claimsDict["purpose"].Should().Be("mfa");
     }
 }

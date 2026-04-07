@@ -27,14 +27,4 @@ public class AccessTokenService : IAccessTokenService
         };
         return _jwtService.Sign(claims);
     }
-
-    public string CreateMfaToken(Guid userId)
-    {
-        var claims = new List<Claim>
-        {
-            new("sub", userId.ToString()),
-            new("purpose", "mfa")
-        };
-        return _jwtService.Sign(claims, expireMinutes: 5);
-    }
 }

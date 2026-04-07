@@ -33,9 +33,7 @@ builder.Host.UseSerilog((ctx, config) => config
 // ── Infrastructure layer (DB, Redis, services) ──
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Authentication (JWT RS256) ──
-var keyManager = new KeyManagementService(builder.Configuration);
-builder.Services.AddSingleton(keyManager);
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -47,28 +45,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = builder.Configuration["JwtSettings:Audience"] ?? "SensorX.Warehouse.Api",
             ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKeyResolver = keyManager.ResolveSigningKey,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:HmacSecret"] ?? "fallback-secure-secret-key-that-is-long-enough")),
             ClockSkew = TimeSpan.Zero,
             NameClaimType = "name",
             RoleClaimType = "role"
         };
-        options.Events = new JwtBearerEvents
-        {
-            OnTokenValidated = async context =>
-            {
-                var jti = context.Principal?.FindFirst("jti")?.Value;
-                if (jti != null)
-                {
-                    var blacklistService = context.HttpContext.RequestServices
-                        .GetRequiredService<ITokenBlacklistService>();
-                    if (await blacklistService.IsBlacklistedAsync(jti))
-                    {
-                        context.Fail("Token has been revoked");
-                    }
-                }
-            }
-        };
+
     });
 
 // ── Authorization (Redis-based permissions) ──
@@ -187,7 +169,7 @@ app.UseCors("Production");          // [4] CORS check before auth
 app.UseAuthentication();            // [5] Validate JWT signature + claims
 app.UseAuthorization();             // [6] Check role/scope → 403 if denied
 app.UseCorrelationId();             // [7] Inject X-Correlation-Id
-app.UseAuditLogging();              // [8] Log AFTER auth (has userId)
+
 
 // ── Endpoints ──
 app.MapControllers();

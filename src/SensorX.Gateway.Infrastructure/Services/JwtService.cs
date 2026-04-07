@@ -9,15 +9,15 @@ namespace SensorX.Gateway.Infrastructure.Services;
 
 public class JwtService : IJwtService
 {
-    private readonly IKeyManagementService _keyManager;
+    private readonly string _secret;
     private readonly string _issuer;
     private readonly string _audience;
     private readonly int _accessTokenMinutes;
     private readonly TokenValidationParameters _validationParameters;
 
-    public JwtService(IKeyManagementService keyManager, IConfiguration configuration)
+    public JwtService(IConfiguration configuration)
     {
-        _keyManager = keyManager;
+        _secret = configuration["JwtSettings:HmacSecret"] ?? "fallback-secure-secret-key-that-is-long-enough";
         _issuer = configuration["JwtSettings:Issuer"] ?? "https://gateway.yourdomain.com";
         _audience = configuration["JwtSettings:Audience"] ?? "api";
         _accessTokenMinutes = configuration.GetValue("JwtSettings:AccessTokenMinutes", 15);
@@ -30,14 +30,15 @@ public class JwtService : IJwtService
             ValidAudience = _audience,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKeyResolver = _keyManager.ResolveSigningKey,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_secret)),
             ClockSkew = TimeSpan.Zero
         };
     }
 
     public string Sign(IEnumerable<Claim> claims, int? expireMinutes = null)
     {
-        var credentials = _keyManager.GetSigningCredentials();
+        var securityKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_secret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
         var now = DateTime.UtcNow;
         var expires = now.AddMinutes(expireMinutes ?? _accessTokenMinutes);
 
@@ -48,7 +49,6 @@ public class JwtService : IJwtService
         };
 
         var header = new JwtHeader(credentials);
-        header["kid"] = _keyManager.GetKid();
 
         var payload = new JwtPayload(
             issuer: _issuer, audience: _audience,

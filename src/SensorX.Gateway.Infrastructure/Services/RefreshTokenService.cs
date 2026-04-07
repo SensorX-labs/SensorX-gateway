@@ -4,18 +4,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SensorX.Gateway.Domain.Entities;
 using SensorX.Gateway.Domain.Interfaces;
-using SensorX.Gateway.Infrastructure.Persistence;
+using SensorX.Gateway.Domain.Interfaces.Repositories;
 
 namespace SensorX.Gateway.Infrastructure.Services;
 
 public class RefreshTokenService : IRefreshTokenService
 {
-    private readonly AppDbContext _db;
+    private readonly IRefreshTokenRepository _repo;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly string _hmacSecret;
 
-    public RefreshTokenService(AppDbContext db, IConfiguration configuration)
+    public RefreshTokenService(IRefreshTokenRepository repo, IUnitOfWork unitOfWork, IConfiguration configuration)
     {
-        _db = db;
+        _repo = repo;
+        _unitOfWork = unitOfWork;
         _hmacSecret = configuration["JwtSettings:HmacSecret"]
             ?? throw new InvalidOperationException("JwtSettings:HmacSecret is required");
     }
@@ -25,21 +27,16 @@ public class RefreshTokenService : IRefreshTokenService
         var raw = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var hmac = ComputeHmac(raw);
 
-        await _db.RefreshTokens.AddAsync(new RefreshToken
-        {
-            UserId = userId,
-            TokenHmac = hmac,
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(expiryDays)
-        });
-        await _db.SaveChangesAsync();
+        var rt = RefreshToken.Create(userId, hmac, DateTimeOffset.UtcNow.AddDays(expiryDays));
+        _repo.Add(rt);
+        await _unitOfWork.SaveChangesAsync();
         return raw;
     }
 
     public async Task<(Guid UserId, string NewRawToken)> RefreshAsync(string rawToken)
     {
         var hmac = ComputeHmac(rawToken);
-        var storedToken = await _db.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.TokenHmac == hmac);
+        var storedToken = await _repo.GetByTokenHmacAsync(hmac);
 
         if (storedToken == null)
             throw new InvalidOperationException("INVALID_TOKEN");
@@ -53,46 +50,34 @@ public class RefreshTokenService : IRefreshTokenService
         if (storedToken.ExpiresAt < DateTimeOffset.UtcNow)
             throw new InvalidOperationException("TOKEN_EXPIRED");
 
-        storedToken.IsRevoked = true;
-        storedToken.LastUsedAt = DateTimeOffset.UtcNow;
+        storedToken.MarkAsUsed();
 
         var newRaw = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var newHmac = ComputeHmac(newRaw);
 
-        await _db.RefreshTokens.AddAsync(new RefreshToken
-        {
-            UserId = storedToken.UserId,
-            TokenHmac = newHmac,
-            ExpiresAt = storedToken.ExpiresAt
-        });
+        var newRt = RefreshToken.Create(storedToken.UserId, newHmac, storedToken.ExpiresAt);
+        _repo.Add(newRt);
 
-        await _db.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return (storedToken.UserId, newRaw);
     }
 
     public async Task RevokeAsync(string rawToken)
     {
         var hmac = ComputeHmac(rawToken);
-        var token = await _db.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.TokenHmac == hmac);
+        var token = await _repo.GetByTokenHmacAsync(hmac);
 
         if (token != null)
         {
-            token.IsRevoked = true;
-            await _db.SaveChangesAsync();
+            token.Revoke();
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 
     public async Task RevokeAllForUserAsync(Guid userId)
     {
-        var tokens = await _db.RefreshTokens
-            .Where(rt => rt.UserId == userId && !rt.IsRevoked)
-            .ToListAsync();
-
-        foreach (var token in tokens)
-            token.IsRevoked = true;
-
-        await _db.SaveChangesAsync();
+        await _repo.RevokeAllForUserAsync(userId);
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private string ComputeHmac(string rawToken)
