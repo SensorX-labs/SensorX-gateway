@@ -11,7 +11,7 @@ public class RefreshToken : Entity<Guid>
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? LastUsedAt { get; private set; }
 
-    public User User { get; private set; } = null!;
+    public Account Account { get; private set; } = null!;
 
     private RefreshToken() { }
 

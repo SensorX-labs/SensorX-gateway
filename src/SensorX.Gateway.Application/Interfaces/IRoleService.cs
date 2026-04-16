@@ -5,12 +5,7 @@ namespace SensorX.Gateway.Application.Interfaces;
 
 public interface IRoleService
 {
-    Task<ApiResponse<IEnumerable<RoleResponse>>> GetAllRolesAsync();
-    Task<ApiResponse<RoleResponse>> GetRoleByIdAsync(Guid id);
-    Task<ApiResponse<IEnumerable<RoleResponse>>> GetUserRolesAsync(Guid userId);
-    Task<ApiResponse<RoleResponse>> CreateRoleAsync(CreateRoleRequest request);
-    Task<ApiResponse<RoleResponse>> UpdateRoleAsync(Guid id, UpdateRoleRequest request);
-    Task<ApiResponse> DeleteRoleAsync(Guid id);
+    ApiResponse<IEnumerable<RoleResponse>> GetAllRoles();
+    Task<ApiResponse<RoleResponse>> GetUserRoleAsync(Guid userId);
     Task<ApiResponse> AssignRoleToUserAsync(AssignRoleRequest request);
-    Task<ApiResponse> RemoveRoleFromUserAsync(Guid userId, Guid roleId);
 }
