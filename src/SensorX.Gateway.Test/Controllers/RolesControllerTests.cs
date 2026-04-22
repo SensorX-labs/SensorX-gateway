@@ -8,69 +8,85 @@ using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Domain.Enums;
 using Xunit;
 
-namespace SensorX.Gateway.Test.Controllers;
-
-public class RolesControllerTests
+namespace SensorX.Gateway.Test.Controllers
 {
-    private readonly Mock<IRoleService> _mockRoleService;
-    private readonly RolesController _controller;
-
-    public RolesControllerTests()
+    public class RolesControllerTests
     {
-        _mockRoleService = new Mock<IRoleService>();
-        _controller = new RolesController(_mockRoleService.Object);
-    }
+        private readonly Mock<IRoleService> _mockRoleService;
+        private readonly RolesController _controller;
 
-    [Fact]
-    public void GetAllRoles_ShouldReturnOk()
-    {
-        // Arrange
-        var roles = new List<RoleResponse>
+        public RolesControllerTests()
         {
-            new RoleResponse(1, "Admin"),
-            new RoleResponse(2, "SaleStaff")
-        };
-        _mockRoleService.Setup(x => x.GetAllRoles())
-            .Returns(ApiResponse<IEnumerable<RoleResponse>>.SuccessResponse(roles));
+            _mockRoleService = new Mock<IRoleService>();
+            _controller = new RolesController(_mockRoleService.Object);
+        }
 
-        // Act
-        var result = _controller.GetAllRoles() as OkObjectResult;
+        [Fact]
+        public void GetAllRoles_ShouldReturnOk()
+        {
+            var roles = new List<RoleResponse>
+            {
+                new RoleResponse(1, "Admin"),
+                new RoleResponse(2, "SaleStaff")
+            };
+            _mockRoleService.Setup(x => x.GetAllRoles())
+                .Returns(ApiResponse<IEnumerable<RoleResponse>>.SuccessResponse(roles));
 
-        // Assert
-        result.Should().NotBeNull();
-        result!.StatusCode.Should().Be(200);
-    }
+            var result = _controller.GetAllRoles() as OkObjectResult;
 
-    [Fact]
-    public async Task GetUserRole_WhenExists_ShouldReturnOk()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var roleResponse = new RoleResponse(2, "SaleStaff");
-        _mockRoleService.Setup(x => x.GetUserRoleAsync(userId))
-            .ReturnsAsync(ApiResponse<RoleResponse>.SuccessResponse(roleResponse));
+            result.Should().NotBeNull();
+            result!.StatusCode.Should().Be(200);
+        }
 
-        // Act
-        var result = await _controller.GetUserRole(userId) as OkObjectResult;
+        [Fact]
+        public async Task GetUserRole_WhenExists_ShouldReturnOk()
+        {
+            var userId = Guid.NewGuid();
+            var roleResponse = new RoleResponse(2, "SaleStaff");
+            _mockRoleService.Setup(x => x.GetUserRoleAsync(userId))
+                .ReturnsAsync(ApiResponse<RoleResponse>.SuccessResponse(roleResponse));
 
-        // Assert
-        result.Should().NotBeNull();
-        result!.StatusCode.Should().Be(200);
-    }
+            var result = await _controller.GetUserRole(userId) as OkObjectResult;
 
-    [Fact]
-    public async Task AssignRole_WhenSuccess_ShouldReturnOk()
-    {
-        // Arrange
-        var request = new AssignRoleRequest(Guid.NewGuid(), Role.SaleStaff);
-        _mockRoleService.Setup(x => x.AssignRoleToUserAsync(request))
-            .ReturnsAsync(ApiResponse.SuccessResponse("OK"));
+            result.Should().NotBeNull();
+            result!.StatusCode.Should().Be(200);
+        }
 
-        // Act
-        var result = await _controller.AssignRole(request) as OkObjectResult;
+        [Fact]
+        public async Task GetUserRole_WhenNotExists_ShouldReturnNotFound()
+        {
+            var userId = Guid.NewGuid();
+            _mockRoleService.Setup(x => x.GetUserRoleAsync(userId))
+                .ReturnsAsync(ApiResponse<RoleResponse>.FailResponse("Not Found"));
 
-        // Assert
-        result.Should().NotBeNull();
-        result!.StatusCode.Should().Be(200);
+            var result = await _controller.GetUserRole(userId);
+
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task AssignRole_WhenSuccess_ShouldReturnOk()
+        {
+            var request = new AssignRoleRequest(Guid.NewGuid(), Role.SaleStaff);
+            _mockRoleService.Setup(x => x.AssignRoleToUserAsync(request))
+                .ReturnsAsync(ApiResponse.SuccessResponse("OK"));
+
+            var result = await _controller.AssignRole(request) as OkObjectResult;
+
+            result.Should().NotBeNull();
+            result!.StatusCode.Should().Be(200);
+        }
+
+        [Fact]
+        public async Task AssignRole_WhenFail_ShouldReturnBadRequest()
+        {
+            var request = new AssignRoleRequest(Guid.NewGuid(), Role.SaleStaff);
+            _mockRoleService.Setup(x => x.AssignRoleToUserAsync(request))
+                .ReturnsAsync(ApiResponse.FailResponse("Error"));
+
+            var result = await _controller.AssignRole(request);
+
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
     }
 }
