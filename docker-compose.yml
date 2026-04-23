@@ -1,11 +1,12 @@
 version: "3.8"
 
-# ── Shared overlay network (all services routing through Traefik) ──
 networks:
   proxy:
     name: proxy
   internal:
     internal: true
+  backend:
+    external: true
 
 services:
 
@@ -72,6 +73,7 @@ services:
     networks:
       - proxy
       - internal
+      - backend
     depends_on:
       postgres:
         condition: service_healthy
