@@ -5,6 +5,7 @@ using Moq;
 using SensorX.Gateway.Application.DTOs;
 using SensorX.Gateway.Application.Services;
 using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 using Xunit;
@@ -13,8 +14,7 @@ namespace SensorX.Gateway.Test.Services;
 
 public class AuthServiceTests
 {
-    private readonly Mock<IUserRepository> _mockUserRepository;
-    private readonly Mock<IRoleRepository> _mockRoleRepository;
+    private readonly Mock<IAccountRepository> _mockAccountRepository;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork;
     private readonly Mock<IJwtService> _mockJwtService;
     private readonly Mock<IAccessTokenService> _mockAccessTokenService;
@@ -28,8 +28,7 @@ public class AuthServiceTests
 
     public AuthServiceTests()
     {
-        _mockUserRepository = new Mock<IUserRepository>();
-        _mockRoleRepository = new Mock<IRoleRepository>();
+        _mockAccountRepository = new Mock<IAccountRepository>();
         _mockUnitOfWork = new Mock<IUnitOfWork>();
         _mockJwtService = new Mock<IJwtService>();
         _mockAccessTokenService = new Mock<IAccessTokenService>();
@@ -45,8 +44,7 @@ public class AuthServiceTests
         _mockLogger = new Mock<ILogger<AuthService>>();
 
         _authService = new AuthService(
-            _mockUserRepository.Object,
-            _mockRoleRepository.Object,
+            _mockAccountRepository.Object,
             _mockUnitOfWork.Object,
             _mockJwtService.Object,
             _mockAccessTokenService.Object,
@@ -62,12 +60,12 @@ public class AuthServiceTests
     {
         var email = "test@example.com";
         var request = new LoginRequest(email, "pass123");
-        var user = User.Create(email, "hash");
+        var account = Account.Create(email, "Test Name", "hash", Role.SaleStaff);
 
-        _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+        _mockAccountRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(account);
         _mockPasswordHasher.Setup(x => x.VerifyAsync("pass123", "hash")).ReturnsAsync(true);
-        _mockAccessTokenService.Setup(x => x.CreateToken(user.Id, email, "", "")).Returns("access_token");
-        _mockRefreshTokenService.Setup(x => x.CreateAsync(user.Id, It.IsAny<int>())).ReturnsAsync("refresh_token");
+        _mockAccessTokenService.Setup(x => x.CreateToken(account.Id, email, "SaleStaff", "SaleStaff")).Returns("access_token");
+        _mockRefreshTokenService.Setup(x => x.CreateAsync(account.Id, It.IsAny<int>())).ReturnsAsync("refresh_token");
 
         var result = await _authService.LoginAsync(request);
 
@@ -80,9 +78,9 @@ public class AuthServiceTests
     {
         var email = "test@example.com";
         var request = new LoginRequest(email, "wrong");
-        var user = User.Create(email, "hash");
+        var account = Account.Create(email, "Test Name", "hash", Role.SaleStaff);
 
-        _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+        _mockAccountRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(account);
         _mockPasswordHasher.Setup(x => x.VerifyAsync("wrong", "hash")).ReturnsAsync(false);
 
         var result = await _authService.LoginAsync(request);

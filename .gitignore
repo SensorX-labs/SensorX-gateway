@@ -27,3 +27,4 @@ docker-compose.override.yml
 letsencrypt/
 traefik/acme.json
 *.pem
+.agents/skills/
