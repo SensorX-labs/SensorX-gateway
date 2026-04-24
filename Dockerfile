@@ -23,14 +23,15 @@ RUN dotnet publish "SensorX.Gateway.Api/SensorX.Gateway.Api.csproj" \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-USER appuser
 
 COPY --from=build /app/publish .
 
-# Keys directory will be mounted as a volume or Docker Secret
-RUN mkdir -p Keys
+# Create keys dir as root, then hand over ownership
+RUN mkdir -p /app/Keys && chown -R appuser:appgroup /app/Keys
+
+USER appuser
+
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080

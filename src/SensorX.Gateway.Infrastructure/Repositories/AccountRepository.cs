@@ -5,36 +5,34 @@ using SensorX.Gateway.Infrastructure.Persistence;
 
 namespace SensorX.Gateway.Infrastructure.Repositories;
 
-public class UserRepository : IUserRepository
+public class AccountRepository : IAccountRepository
 {
     private readonly AppDbContext _context;
 
-    public UserRepository(AppDbContext context)
+    public AccountRepository(AppDbContext context)
     {
         _context = context;
     }
 
-    public async Task<User?> GetByEmailAsync(string email)
+    public async Task<Account?> GetByEmailAsync(string email)
     {
-        return await _context.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+        return await _context.Accounts
             .FirstOrDefaultAsync(u => u.Email == email);
     }
 
-    public async Task<User?> GetByIdAsync(Guid id)
+    public async Task<Account?> GetByIdAsync(Guid id)
     {
-        return await _context.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+        return await _context.Accounts
             .FirstOrDefaultAsync(u => u.Id == id);
     }
 
     public async Task<bool> AnyByEmailAsync(string email)
     {
-        return await _context.Users.AnyAsync(u => u.Email == email);
+        return await _context.Accounts.AnyAsync(u => u.Email == email);
     }
 
-    public void Add(User user)
+    public void Add(Account account)
     {
-        _context.Users.Add(user);
+        _context.Accounts.Add(account);
     }
 }

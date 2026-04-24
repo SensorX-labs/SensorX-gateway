@@ -1,10 +1,13 @@
+using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Primitives;
 
 namespace SensorX.Gateway.Domain.Entities;
 
-public class User : AggregateRoot<Guid>
+public class Account : AggregateRoot<Guid>
 {
     public string Email { get; private set; } = null!;
+    public string FullName { get; private set; } = null!;
+    public string? AvatarUrl { get; private set; }
     public string PasswordHash { get; private set; } = null!;
     public Guid SecurityStamp { get; private set; } = Guid.NewGuid();
     public bool IsLocked { get; private set; }
@@ -15,29 +18,37 @@ public class User : AggregateRoot<Guid>
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // Navigation
-    private readonly List<UserRole> _userRoles = new();
-    public IReadOnlyCollection<UserRole> UserRoles => _userRoles.AsReadOnly();
+    public Role Role { get; private set; }
 
+    // Navigation
     private readonly List<RefreshToken> _refreshTokens = new();
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
     // EF Core requires a parameterless constructor
-    private User()
+    private Account()
     {
     }
 
-    private User(string email, string passwordHash) : base(Guid.NewGuid())
+    private Account(string email, string fullName, string passwordHash, Role role = Role.SaleStaff) : base(Guid.NewGuid())
     {
         Email = email;
+        FullName = fullName;
         PasswordHash = passwordHash;
+        Role = role;
         CreatedAt = DateTimeOffset.UtcNow;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public static User Create(string email, string passwordHash)
+    public static Account Create(string email, string fullName, string passwordHash, Role role = Role.SaleStaff)
     {
-        return new User(email, passwordHash);
+        return new Account(email, fullName, passwordHash, role);
+    }
+
+    public void UpdateProfile(string fullName, string? avatarUrl)
+    {
+        FullName = fullName;
+        AvatarUrl = avatarUrl;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void ChangePassword(string newPasswordHash)
@@ -68,42 +79,11 @@ public class User : AggregateRoot<Guid>
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public void AddRole(Guid roleId)
+    public void SetRole(Role role)
     {
-        if (!_userRoles.Any(ur => ur.RoleId == roleId))
+        if (Role != role)
         {
-            _userRoles.Add(new UserRole { UserId = Id, RoleId = roleId });
-            UpdatedAt = DateTimeOffset.UtcNow;
-        }
-    }
-
-    public bool RemoveRole(Guid roleId)
-    {
-        var userRole = _userRoles.FirstOrDefault(ur => ur.RoleId == roleId);
-        if (userRole != null)
-        {
-            _userRoles.Remove(userRole);
-            UpdatedAt = DateTimeOffset.UtcNow;
-            return true;
-        }
-        return false;
-    }
-
-    public bool HasRole(Guid roleId)
-    {
-        return _userRoles.Any(ur => ur.RoleId == roleId);
-    }
-
-    public IEnumerable<Guid> GetRoleIds()
-    {
-        return _userRoles.Select(ur => ur.RoleId).ToList();
-    }
-
-    public void ClearRoles()
-    {
-        if (_userRoles.Any())
-        {
-            _userRoles.Clear();
+            Role = role;
             UpdatedAt = DateTimeOffset.UtcNow;
         }
     }

@@ -11,8 +11,7 @@ namespace SensorX.Gateway.Application.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
+    private readonly IAccountRepository _accountRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtService _jwtService;
     private readonly IAccessTokenService _accessTokenService;
@@ -23,8 +22,7 @@ public class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
-        IUserRepository userRepository,
-        IRoleRepository roleRepository,
+        IAccountRepository accountRepository,
         IUnitOfWork unitOfWork,
         IJwtService jwtService,
         IAccessTokenService accessTokenService,
@@ -34,8 +32,7 @@ public class AuthService : IAuthService
         IConfiguration configuration,
         ILogger<AuthService> logger)
     {
-        _userRepository = userRepository;
-        _roleRepository = roleRepository;
+        _accountRepository = accountRepository;
         _unitOfWork = unitOfWork;
         _jwtService = jwtService;
         _accessTokenService = accessTokenService;
@@ -48,37 +45,37 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse<TokenPairResponse>> LoginAsync(LoginRequest request)
     {
-        var user = await _userRepository.GetByEmailAsync(request.Email);
-        if (user == null)
+        var account = await _accountRepository.GetByEmailAsync(request.Email);
+        if (account == null)
             return ApiResponse<TokenPairResponse>.FailResponse("Invalid credentials");
 
-        if (user.IsLocked && user.LockedUntil > DateTimeOffset.UtcNow)
+        if (account.IsLocked && account.LockedUntil > DateTimeOffset.UtcNow)
         {
-            var msg = $"Account locked until {user.LockedUntil}";
+            var msg = $"Account locked until {account.LockedUntil}";
             return ApiResponse<TokenPairResponse>.FailResponse(msg);
         }
 
-        if (user.IsLocked && user.LockedUntil <= DateTimeOffset.UtcNow)
+        if (account.IsLocked && account.LockedUntil <= DateTimeOffset.UtcNow)
         {
-            user.ResetLoginFailures();
+            account.ResetLoginFailures();
         }
 
-        if (!await _passwordHasher.VerifyAsync(request.Password, user.PasswordHash))
+        if (!await _passwordHasher.VerifyAsync(request.Password, account.PasswordHash))
         {
             var maxAttempts = _configuration.GetValue<int>("Security:MaxLoginAttempts", 5);
-            var lockoutMinutes = 15 * (int)Math.Pow(2, user.LockCount);
+            var lockoutMinutes = 15 * (int)Math.Pow(2, account.LockCount);
             
-            user.RecordFailedLogin(maxAttempts, lockoutMinutes);
+            account.RecordFailedLogin(maxAttempts, lockoutMinutes);
             
-            if (user.IsLocked)
+            if (account.IsLocked)
             {
-                _logger.LogWarning("Account locked for {Email} after {Attempts} failed attempts", user.Email, user.LoginFailCount);
+                _logger.LogWarning("Account locked for {Email} after {Attempts} failed attempts", account.Email, account.LoginFailCount);
             }
             await _unitOfWork.SaveChangesAsync();
             return ApiResponse<TokenPairResponse>.FailResponse("Invalid credentials");
         }
 
-        var response = await IssueTokenPairAsync(user);
+        var response = await IssueTokenPairAsync(account);
         return ApiResponse<TokenPairResponse>.SuccessResponse(response);
     }
 
@@ -86,20 +83,21 @@ public class AuthService : IAuthService
     {
         try
         {
-            var (userId, newRawToken) = await _refreshTokenService.RefreshAsync(request.RefreshToken);
-            var user = await _userRepository.GetByIdAsync(userId);
+            var (accountId, newRawToken) = await _refreshTokenService.RefreshAsync(request.RefreshToken);
+            var account = await _accountRepository.GetByIdAsync(accountId);
 
-            if (user == null || user.IsLocked)
+            if (account == null || account.IsLocked)
                 return ApiResponse<TokenPairResponse>.FailResponse("Account is locked or invalid");
 
-            var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
-            await _permissionService.SetPermissionsAsync(userId, roles);
+            var roleStr = account.Role.ToString();
+            var roles = new List<string> { roleStr };
+            await _permissionService.SetPermissionsAsync(accountId, roles);
 
             var accessToken = _accessTokenService.CreateToken(
-                user.Id, user.Email,
-                string.Join(",", roles), string.Join(" ", roles));
+                account.Id, account.Email,
+                roleStr, roleStr);
 
-            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(user.Id, user.Email, roles));
+            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles));
             return ApiResponse<TokenPairResponse>.SuccessResponse(result);
         }
         catch (InvalidOperationException ex)
@@ -113,9 +111,9 @@ public class AuthService : IAuthService
     {
         await _refreshTokenService.RevokeAsync(request.RefreshToken);
 
-        if (userIdString != null && Guid.TryParse(userIdString, out var userId))
+        if (userIdString != null && Guid.TryParse(userIdString, out var accountId))
         {
-            await _permissionService.RemovePermissionsAsync(userId);
+            await _permissionService.RemovePermissionsAsync(accountId);
         }
 
         return ApiResponse.SuccessResponse("Logged out");
@@ -123,22 +121,20 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse<object>> RegisterAsync(RegisterRequest request)
     {
-        if (await _userRepository.AnyByEmailAsync(request.Email))
+        if (await _accountRepository.AnyByEmailAsync(request.Email))
             return ApiResponse<object>.FailResponse("Email already registered");
 
         var passwordHash = await _passwordHasher.HashAsync(request.Password);
-        var user = User.Create(request.Email, passwordHash);
         
-        _userRepository.Add(user);
-
-        var defaultRole = await _roleRepository.GetByNameAsync("user");
-        if (defaultRole != null)
-        {
-            user.AddRole(defaultRole.Id);
-        }
+        // Split email for a preliminary FullName
+        var generatedFullName = request.Email.Split('@')[0];
+        
+        var account = Account.Create(request.Email, generatedFullName, passwordHash);
+        
+        _accountRepository.Add(account);
 
         await _unitOfWork.SaveChangesAsync();
-        return ApiResponse<object>.SuccessResponse(new { userId = user.Id }, "User registered");
+        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
     }
 
     public ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request)
@@ -158,50 +154,51 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse> RevokeAsync(string? userIdString)
     {
-        if (userIdString != null && Guid.TryParse(userIdString, out var userId))
+        if (userIdString != null && Guid.TryParse(userIdString, out var accountId))
         {
-            await _refreshTokenService.RevokeAllForUserAsync(userId);
-            await _permissionService.RemovePermissionsAsync(userId);
+            await _refreshTokenService.RevokeAllForUserAsync(accountId);
+            await _permissionService.RemovePermissionsAsync(accountId);
         }
         return ApiResponse.SuccessResponse("All tokens revoked");
     }
 
     public async Task<ApiResponse> ChangePasswordAsync(string? userIdString, ChangePasswordRequest request)
     {
-        if (userIdString == null || !Guid.TryParse(userIdString, out var userId))
+        if (userIdString == null || !Guid.TryParse(userIdString, out var accountId))
             return ApiResponse.FailResponse("Unauthorized");
 
-        var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null)
+        var account = await _accountRepository.GetByIdAsync(accountId);
+        if (account == null)
             return ApiResponse.FailResponse("Unauthorized");
 
-        if (!await _passwordHasher.VerifyAsync(request.OldPassword, user.PasswordHash))
+        if (!await _passwordHasher.VerifyAsync(request.OldPassword, account.PasswordHash))
             return ApiResponse.FailResponse("Incorrect old password");
 
         var newPasswordHash = await _passwordHasher.HashAsync(request.NewPassword);
-        user.ChangePassword(newPasswordHash);
+        account.ChangePassword(newPasswordHash);
         
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.SuccessResponse("Password changed successfully");
     }
 
-    private async Task<TokenPairResponse> IssueTokenPairAsync(User user)
+    private async Task<TokenPairResponse> IssueTokenPairAsync(Account account)
     {
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var roleStr = account.Role.ToString();
+        var roles = new List<string> { roleStr };
         
-        user.ResetLoginFailures();
+        account.ResetLoginFailures();
         await _unitOfWork.SaveChangesAsync();
 
-        await _permissionService.SetPermissionsAsync(user.Id, roles);
+        await _permissionService.SetPermissionsAsync(account.Id, roles);
 
         var accessToken = _accessTokenService.CreateToken(
-            user.Id, user.Email,
-            string.Join(",", roles), string.Join(" ", roles));
+            account.Id, account.Email,
+            roleStr, roleStr);
 
-        var refreshToken = await _refreshTokenService.CreateAsync(user.Id);
+        var refreshToken = await _refreshTokenService.CreateAsync(account.Id);
 
         return new TokenPairResponse(accessToken, refreshToken,
-            new UserInfoResponse(user.Id, user.Email, roles));
+            new UserInfoResponse(account.Id, account.Email, roles));
     }
 }
