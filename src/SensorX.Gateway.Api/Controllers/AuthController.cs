@@ -55,6 +55,16 @@ public class AuthController : ControllerBase
         return Created("", result);
     }
 
+    [HttpPost("create")]
+    public async Task<IActionResult> CreateAccount([FromBody] RegisterRequest request)
+    {
+        var result = await _authService.CreateAccountAsync(request);
+        if (!result.Success)
+            return Conflict(result);
+
+        return Created("", result);
+    }
+
     [Authorize]
     [HttpPost("introspect")]
     public IActionResult Introspect([FromBody] IntrospectRequest request)

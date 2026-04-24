@@ -62,6 +62,10 @@ public static class DependencyInjection
                     h.Password(configuration["RabbitMQ:Password"] ?? "guest");
                 });
 
+                // Đổi tên Exchange thay vì dùng tên mặc định của MassTransit
+                cfg.Message<SensorX.Gateway.Domain.Events.AccountRegisteredEvent>(e => 
+                    e.SetEntityName("sensorx.events.account-registered"));
+
                 cfg.ConfigureEndpoints(context);
             });
         });
