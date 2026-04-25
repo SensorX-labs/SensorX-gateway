@@ -14,4 +14,5 @@ public interface IAuthService
     Task<ApiResponse> RevokeAsync(string? userIdString);
     Task<ApiResponse> ChangePasswordAsync(string? userIdString, ChangePasswordRequest request);
     Task<ApiResponse<IEnumerable<UserResponse>>> GetAllUsersAsync();
+    Task<ApiResponse> ToggleUserLockAsync(Guid userId);
 }

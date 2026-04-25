@@ -241,6 +241,22 @@ public class AuthService : IAuthService
         return ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(users);
     }
 
+    public async Task<ApiResponse> ToggleUserLockAsync(Guid userId)
+    {
+        var account = await _accountRepository.GetByIdAsync(userId);
+        if (account == null)
+            return ApiResponse.FailResponse("Account not found");
+
+        account.ToggleLock();
+        await _unitOfWork.SaveChangesAsync();
+
+        var status = account.IsLocked ? "locked" : "unlocked";
+        _logger.LogInformation("Account {Email} ({AccountId}) has been {Status}", 
+            account.Email, account.Id, status);
+
+        return ApiResponse.SuccessResponse($"Account {status} successfully");
+    }
+
     private async Task<TokenPairResponse> IssueTokenPairAsync(Account account)
     {
         var roleStr = account.Role.ToString();

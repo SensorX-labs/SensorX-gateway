@@ -88,6 +88,17 @@ public class Account : AggregateRoot<Guid>
         }
     }
 
+    public void ToggleLock()
+    {
+        IsLocked = !IsLocked;
+        if (!IsLocked)
+        {
+            LockedUntil = null;
+            LoginFailCount = 0;
+        }
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void RemoveAllRefreshTokens()
     {
         _refreshTokens.Clear();
