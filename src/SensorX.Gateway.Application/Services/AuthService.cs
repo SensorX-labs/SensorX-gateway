@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SensorX.Gateway.Application.Commons.Responses;
@@ -6,6 +7,7 @@ using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Domain.Entities;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
+using SensorX.Gateway.Domain.Events;
 
 namespace SensorX.Gateway.Application.Services;
 
@@ -20,6 +22,7 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public AuthService(
         IAccountRepository accountRepository,
@@ -30,7 +33,8 @@ public class AuthService : IAuthService
         IRedisPermissionService permissionService,
         IPasswordHasher passwordHasher,
         IConfiguration configuration,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IPublishEndpoint publishEndpoint)
     {
         _accountRepository = accountRepository;
         _unitOfWork = unitOfWork;
@@ -41,6 +45,7 @@ public class AuthService : IAuthService
         _passwordHasher = passwordHasher;
         _configuration = configuration;
         _logger = logger;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task<ApiResponse<TokenPairResponse>> LoginAsync(LoginRequest request)
@@ -134,7 +139,47 @@ public class AuthService : IAuthService
         _accountRepository.Add(account);
 
         await _unitOfWork.SaveChangesAsync();
+
+        // Bắn sự kiện ra RabbitMQ
+        await _publishEndpoint.Publish(new AccountRegisteredEvent
+        {
+            AccountId = account.Id,
+            Email = account.Email,
+            FullName = account.FullName,
+            AccountType = "customer",
+            RegisteredAt = DateTimeOffset.UtcNow
+        });
+
         return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
+    }
+
+    public async Task<ApiResponse<object>> CreateAccountAsync(RegisterRequest request)
+    {
+        if (await _accountRepository.AnyByEmailAsync(request.Email))
+            return ApiResponse<object>.FailResponse("Email already exists");
+
+        var passwordHash = await _passwordHasher.HashAsync(request.Password);
+        
+        // Split email for a preliminary FullName
+        var generatedFullName = request.Email.Split('@')[0];
+        
+        var account = Account.Create(request.Email, generatedFullName, passwordHash);
+        
+        _accountRepository.Add(account);
+
+        await _unitOfWork.SaveChangesAsync();
+
+        // Bắn sự kiện ra RabbitMQ
+        await _publishEndpoint.Publish(new AccountRegisteredEvent
+        {
+            AccountId = account.Id,
+            Email = account.Email,
+            FullName = account.FullName,
+            AccountType = "staff",
+            RegisteredAt = DateTimeOffset.UtcNow
+        });
+
+        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account created");
     }
 
     public ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request)
