@@ -63,7 +63,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Production", policy =>
         policy.WithOrigins(
                 builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                ?? new[] { "https://app.yourdomain.com", "https://admin.yourdomain.com" })
+                ?? new[] { "https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000" })
             .WithMethods("GET", "POST", "PUT", "DELETE")
             .AllowCredentials()
             .AllowAnyHeader()));

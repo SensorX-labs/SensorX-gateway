@@ -36,7 +36,6 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
     {
@@ -49,6 +48,16 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await _authService.RegisterAsync(request);
+        if (!result.Success)
+            return Conflict(result);
+
+        return Created("", result);
+    }
+
+    [HttpPost("create")]
+    public async Task<IActionResult> CreateAccount([FromBody] RegisterRequest request)
+    {
+        var result = await _authService.CreateAccountAsync(request);
         if (!result.Success)
             return Conflict(result);
 

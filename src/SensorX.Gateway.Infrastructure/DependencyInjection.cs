@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +46,29 @@ public static class DependencyInjection
 
         // ── Memory cache (for claims enrichment) ──
         services.AddMemoryCache();
+
+        // ── RabbitMQ / MassTransit ──
+        services.AddMassTransit(x =>
+        {
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                var rabbitMqHost = configuration["RabbitMQ:Host"] ?? "localhost";
+                var rabbitMqPort = configuration.GetValue<ushort>("RabbitMQ:Port", 5672);
+                var rabbitMqVHost = configuration["RabbitMQ:VirtualHost"] ?? "/";
+                
+                cfg.Host(rabbitMqHost, rabbitMqPort, rabbitMqVHost, h =>
+                {
+                    h.Username(configuration["RabbitMQ:Username"] ?? "guest");
+                    h.Password(configuration["RabbitMQ:Password"] ?? "guest");
+                });
+
+                // Đổi tên Exchange thay vì dùng tên mặc định của MassTransit
+                cfg.Message<SensorX.Gateway.Domain.Events.AccountRegisteredEvent>(e => 
+                    e.SetEntityName("sensorx.events.account-registered"));
+
+                cfg.ConfigureEndpoints(context);
+            });
+        });
 
         return services;
     }
