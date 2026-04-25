@@ -13,4 +13,5 @@ public interface IAuthService
     ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request);
     Task<ApiResponse> RevokeAsync(string? userIdString);
     Task<ApiResponse> ChangePasswordAsync(string? userIdString, ChangePasswordRequest request);
+    Task<ApiResponse<IEnumerable<UserResponse>>> GetAllUsersAsync();
 }

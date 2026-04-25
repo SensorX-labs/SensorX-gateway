@@ -55,7 +55,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("create")]
-    public async Task<IActionResult> CreateAccount([FromBody] RegisterRequest request)
+    public async Task<IActionResult> CreateStaffAccount([FromBody] RegisterRequest request)
     {
         var result = await _authService.CreateAccountAsync(request);
         if (!result.Success)
@@ -91,6 +91,14 @@ public class AuthController : ControllerBase
         if (!result.Success)
             return BadRequest(result);
 
+        return Ok(result);
+    }
+
+    // [Authorize(Roles = "Manager,Admin")]
+    [HttpGet("users")]
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var result = await _authService.GetAllUsersAsync();
         return Ok(result);
     }
 }
