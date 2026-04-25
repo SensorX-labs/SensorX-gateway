@@ -31,6 +31,14 @@ public class AccountRepository : IAccountRepository
         return await _context.Accounts.AnyAsync(u => u.Email == email);
     }
 
+    public async Task<IEnumerable<Account>> GetAllAsync()
+    {
+        return await _context.Accounts
+            .AsNoTracking()
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
     public void Add(Account account)
     {
         _context.Accounts.Add(account);

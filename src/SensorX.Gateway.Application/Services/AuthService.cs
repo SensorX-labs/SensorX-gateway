@@ -5,6 +5,7 @@ using SensorX.Gateway.Application.Commons.Responses;
 using SensorX.Gateway.Application.DTOs;
 using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 using SensorX.Gateway.Domain.Events;
@@ -134,7 +135,7 @@ public class AuthService : IAuthService
         // Split email for a preliminary FullName
         var generatedFullName = request.Email.Split('@')[0];
         
-        var account = Account.Create(request.Email, generatedFullName, passwordHash);
+        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.Customer);
         
         _accountRepository.Add(account);
 
@@ -163,7 +164,7 @@ public class AuthService : IAuthService
         // Split email for a preliminary FullName
         var generatedFullName = request.Email.Split('@')[0];
         
-        var account = Account.Create(request.Email, generatedFullName, passwordHash);
+        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.SaleStaff);
         
         _accountRepository.Add(account);
 
@@ -225,6 +226,19 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.SuccessResponse("Password changed successfully");
+    }
+
+    public async Task<ApiResponse<IEnumerable<UserResponse>>> GetAllUsersAsync()
+    {
+        var accounts = await _accountRepository.GetAllAsync();
+        var users = accounts.Select(a => new UserResponse(
+            a.Id,
+            a.Email,
+            a.FullName,
+            a.Role.ToString(),
+            a.IsLocked,
+            a.CreatedAt));
+        return ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(users);
     }
 
     private async Task<TokenPairResponse> IssueTokenPairAsync(Account account)

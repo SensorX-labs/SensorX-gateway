@@ -23,6 +23,7 @@ public class AuthServiceTests
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
     private readonly IConfiguration _configuration;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
+    private readonly Mock<MassTransit.IPublishEndpoint> _mockPublishEndpoint;
     
     private readonly AuthService _authService;
 
@@ -42,6 +43,7 @@ public class AuthServiceTests
             })
             .Build();
         _mockLogger = new Mock<ILogger<AuthService>>();
+        _mockPublishEndpoint = new Mock<MassTransit.IPublishEndpoint>();
 
         _authService = new AuthService(
             _mockAccountRepository.Object,
@@ -52,7 +54,8 @@ public class AuthServiceTests
             _mockPermissionService.Object,
             _mockPasswordHasher.Object,
             _configuration,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockPublishEndpoint.Object);
     }
 
     [Fact]
@@ -65,7 +68,7 @@ public class AuthServiceTests
         _mockAccountRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(account);
         _mockPasswordHasher.Setup(x => x.VerifyAsync("pass123", "hash")).ReturnsAsync(true);
         _mockAccessTokenService.Setup(x => x.CreateToken(account.Id, email, "SaleStaff", "SaleStaff")).Returns("access_token");
-        _mockRefreshTokenService.Setup(x => x.CreateAsync(account.Id, It.IsAny<int>())).ReturnsAsync("refresh_token");
+        _mockRefreshTokenService.Setup(x => x.CreateAsync(account.Id, 30)).ReturnsAsync("refresh_token");
 
         var result = await _authService.LoginAsync(request);
 
