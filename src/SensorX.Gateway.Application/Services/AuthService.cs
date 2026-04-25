@@ -4,6 +4,7 @@ using SensorX.Gateway.Application.Commons.Responses;
 using SensorX.Gateway.Application.DTOs;
 using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 
@@ -129,12 +130,12 @@ public class AuthService : IAuthService
         // Split email for a preliminary FullName
         var generatedFullName = request.Email.Split('@')[0];
         
-        var account = Account.Create(request.Email, generatedFullName, passwordHash);
+        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.Customer);
         
         _accountRepository.Add(account);
 
         await _unitOfWork.SaveChangesAsync();
-        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
+        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Customer account registered");
     }
 
     public ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request)
