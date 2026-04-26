@@ -6,16 +6,16 @@ using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Serilog;
-using Serilog.Formatting.Compact;
 using SensorX.Gateway.Api.Authorization;
 using SensorX.Gateway.Api.HealthChecks;
+using SensorX.Gateway.Api.Middleware;
+using SensorX.Gateway.Api.ReverseProxy;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Infrastructure;
 using SensorX.Gateway.Infrastructure.Persistence;
 using SensorX.Gateway.Infrastructure.Services;
-using SensorX.Gateway.Api.Middleware;
-using SensorX.Gateway.Api.ReverseProxy;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 // ═══════════════════════════════════════════════════════════════
 //  SensorX API Gateway + Identity Provider
@@ -64,7 +64,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                 ?? new[] { "https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000" })
-            .WithMethods("GET", "POST", "PUT", "DELETE")
+            .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
             .AllowCredentials()
             .AllowAnyHeader()));
 
