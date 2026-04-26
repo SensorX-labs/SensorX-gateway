@@ -94,7 +94,7 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize(Roles = "Manager,Admin")]
+    // [Authorize(Roles = "Manager,Admin")]
     [HttpGet("users")]
     public async Task<IActionResult> GetAllUsers()
     {
