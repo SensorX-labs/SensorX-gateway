@@ -101,4 +101,15 @@ public class AuthController : ControllerBase
         var result = await _authService.GetAllUsersAsync();
         return Ok(result);
     }
+
+    [Authorize(Roles = "Manager,Admin")]
+    [HttpPost("users/{id}/toggle-lock")]
+    public async Task<IActionResult> ToggleUserLock(Guid id)
+    {
+        var result = await _authService.ToggleUserLockAsync(id);
+        if (!result.Success)
+            return NotFound(result);
+
+        return Ok(result);
+    }
 }

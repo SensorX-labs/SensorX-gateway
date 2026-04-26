@@ -38,6 +38,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -51,6 +52,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = "role"
         };
 
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError(context.Exception,
+                    "JWT Authentication failed: {Message} | Path: {Path} | Token: {TokenPreview}",
+                    context.Exception.Message,
+                    context.Request.Path,
+                    context.Request.Headers.Authorization.ToString()[..Math.Min(50, context.Request.Headers.Authorization.ToString().Length)]);
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var sub = context.Principal?.FindFirst("sub")?.Value ?? "unknown";
+                var role = context.Principal?.FindFirst("role")?.Value ?? "unknown";
+                logger.LogInformation("JWT validated | User: {UserId} | Role: {Role} | Path: {Path}", sub, role, context.Request.Path);
+                return Task.CompletedTask;
+            }
+        };
     });
 
 // ── Authorization (Redis-based permissions) ──
