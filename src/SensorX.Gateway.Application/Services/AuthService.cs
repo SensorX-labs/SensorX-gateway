@@ -8,7 +8,6 @@ using SensorX.Gateway.Domain.Entities;
 using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
-using SensorX.Gateway.Domain.Events;
 
 namespace SensorX.Gateway.Application.Services;
 
@@ -70,9 +69,9 @@ public class AuthService : IAuthService
         {
             var maxAttempts = _configuration.GetValue<int>("Security:MaxLoginAttempts", 5);
             var lockoutMinutes = 15 * (int)Math.Pow(2, account.LockCount);
-            
+
             account.RecordFailedLogin(maxAttempts, lockoutMinutes);
-            
+
             if (account.IsLocked)
             {
                 _logger.LogWarning("Account locked for {Email} after {Attempts} failed attempts", account.Email, account.LoginFailCount);
@@ -127,60 +126,62 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse<object>> RegisterAsync(RegisterRequest request)
     {
-        if (await _accountRepository.AnyByEmailAsync(request.Email))
-            return ApiResponse<object>.FailResponse("Email already registered");
+        //     if (await _accountRepository.AnyByEmailAsync(request.Email))
+        //         return ApiResponse<object>.FailResponse("Email already registered");
 
-        var passwordHash = await _passwordHasher.HashAsync(request.Password);
-        
-        // Split email for a preliminary FullName
-        var generatedFullName = request.Email.Split('@')[0];
-        
-        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.Customer);
-        
-        _accountRepository.Add(account);
+        //     var passwordHash = await _passwordHasher.HashAsync(request.Password);
 
-        await _unitOfWork.SaveChangesAsync();
+        //     // Split email for a preliminary FullName
+        //     var generatedFullName = request.Email.Split('@')[0];
 
-        // Bắn sự kiện ra RabbitMQ
-        await _publishEndpoint.Publish(new AccountRegisteredEvent
-        {
-            AccountId = account.Id,
-            Email = account.Email,
-            FullName = account.FullName,
-            AccountType = "customer",
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
+        //     var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.Customer);
 
-        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
+        //     _accountRepository.Add(account);
+
+        //     await _unitOfWork.SaveChangesAsync();
+
+        //     // Bắn sự kiện ra RabbitMQ
+        //     await _publishEndpoint.Publish(new AccountRegisteredEvent
+        //     {
+        //         AccountId = account.Id,
+        //         Email = account.Email,
+        //         FullName = account.FullName,
+        //         AccountType = "customer",
+        //         RegisteredAt = DateTimeOffset.UtcNow
+        //     });
+
+        // return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
+        return ApiResponse<object>.FailResponse("Tính năng đang được phát triển...");
     }
 
     public async Task<ApiResponse<object>> CreateAccountAsync(RegisterRequest request)
     {
-        if (await _accountRepository.AnyByEmailAsync(request.Email))
-            return ApiResponse<object>.FailResponse("Email already exists");
+        //     if (await _accountRepository.AnyByEmailAsync(request.Email))
+        //         return ApiResponse<object>.FailResponse("Email already exists");
 
-        var passwordHash = await _passwordHasher.HashAsync(request.Password);
-        
-        // Split email for a preliminary FullName
-        var generatedFullName = request.Email.Split('@')[0];
-        
-        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.SaleStaff);
-        
-        _accountRepository.Add(account);
+        //     var passwordHash = await _passwordHasher.HashAsync(request.Password);
 
-        await _unitOfWork.SaveChangesAsync();
+        //     // Split email for a preliminary FullName
+        //     var generatedFullName = request.Email.Split('@')[0];
 
-        // Bắn sự kiện ra RabbitMQ
-        await _publishEndpoint.Publish(new AccountRegisteredEvent
-        {
-            AccountId = account.Id,
-            Email = account.Email,
-            FullName = account.FullName,
-            AccountType = "staff",
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
+        //     var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.SaleStaff);
 
-        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account created");
+        //     _accountRepository.Add(account);
+
+        //     await _unitOfWork.SaveChangesAsync();
+
+        //     // Bắn sự kiện ra RabbitMQ
+        //     await _publishEndpoint.Publish(new AccountRegisteredEvent
+        //     {
+        //         AccountId = account.Id,
+        //         Email = account.Email,
+        //         FullName = account.FullName,
+        //         AccountType = "staff",
+        //         RegisteredAt = DateTimeOffset.UtcNow
+        //     });
+
+        //     return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account created");
+        return ApiResponse<object>.FailResponse("Tính năng đang được phát triển...");
     }
 
     public ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request)
@@ -222,7 +223,7 @@ public class AuthService : IAuthService
 
         var newPasswordHash = await _passwordHasher.HashAsync(request.NewPassword);
         account.ChangePassword(newPasswordHash);
-        
+
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.SuccessResponse("Password changed successfully");
@@ -251,7 +252,7 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
 
         var status = account.IsLocked ? "locked" : "unlocked";
-        _logger.LogInformation("Account {Email} ({AccountId}) has been {Status}", 
+        _logger.LogInformation("Account {Email} ({AccountId}) has been {Status}",
             account.Email, account.Id, status);
 
         return ApiResponse.SuccessResponse($"Account {status} successfully");
@@ -261,7 +262,7 @@ public class AuthService : IAuthService
     {
         var roleStr = account.Role.ToString();
         var roles = new List<string> { roleStr };
-        
+
         account.ResetLoginFailures();
         await _unitOfWork.SaveChangesAsync();
 
