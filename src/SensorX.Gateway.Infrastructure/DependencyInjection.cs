@@ -1,3 +1,4 @@
+using System.Reflection;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -75,6 +76,9 @@ public static class DependencyInjection
                 // Đổi tên Exchange thay vì dùng tên mặc định của MassTransit
                 cfg.Message<SensorX.Gateway.Application.Commands.CreateAccount.CreateAccountEvent>(e =>
                     e.SetEntityName("account-created"));
+
+                cfg.Message<SensorX.Gateway.Application.Commands.CustomerRegisterAccount.CustomerRegisterAccountEvent>(e =>
+                    e.SetEntityName("customer-registered"));
 
                 cfg.ConfigureEndpoints(context);
             });
