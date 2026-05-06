@@ -11,7 +11,7 @@ using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 using Role = SensorX.Gateway.Domain.Enums.Role;
 
-public class CreateAccountHandler(
+public sealed class CreateAccountHandler(
     IAccountRepository _accountRepository,
     IUnitOfWork _unitOfWork,
     IPasswordHasher _passwordHasher,

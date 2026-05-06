@@ -5,7 +5,7 @@ using SensorX.Gateway.Domain.Enums;
 namespace SensorX.Gateway.Application.Commands.CreateAccount;
 
 [MessageUrn("account-created")]
-public record CreateAccountEvent
+public sealed record CreateAccountEvent
 {
     public Guid AccountId { get; init; }
     public string Email { get; init; } = string.Empty;
