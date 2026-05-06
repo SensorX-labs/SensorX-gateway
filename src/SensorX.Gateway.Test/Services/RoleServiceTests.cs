@@ -36,7 +36,7 @@ public class RoleServiceTests
 
         // Assert
         result.Success.Should().BeTrue();
-        result.Data.Should().HaveCount(4);
+        result.Data.Should().HaveCount(5);
     }
 
     [Fact]
