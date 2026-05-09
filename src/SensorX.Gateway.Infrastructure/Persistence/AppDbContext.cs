@@ -1,7 +1,8 @@
+using System.Text.Json;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SensorX.Gateway.Domain.Entities;
-using System.Text.Json;
 
 namespace SensorX.Gateway.Infrastructure.Persistence;
 
@@ -16,6 +17,9 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
         // ── Accounts ──
         modelBuilder.Entity<Account>(e =>
         {

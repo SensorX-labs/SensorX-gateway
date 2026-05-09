@@ -1,5 +1,8 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SensorX.Gateway.Application.Commands.CreateAccount;
+using SensorX.Gateway.Application.Commands.CustomerRegisterAccount;
 using SensorX.Gateway.Application.DTOs;
 using SensorX.Gateway.Application.Interfaces;
 
@@ -10,10 +13,12 @@ namespace SensorX.Gateway.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IMediator _mediator;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IMediator mediator)
     {
         _authService = authService;
+        _mediator = mediator;
     }
 
     [HttpPost("login")]
@@ -22,7 +27,7 @@ public class AuthController : ControllerBase
         var result = await _authService.LoginAsync(request);
         if (!result.Success)
             return Unauthorized(result);
-            
+
         return Ok(result);
     }
 
@@ -45,9 +50,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] CustomerRegisterAccountCommand command)
     {
-        var result = await _authService.RegisterAsync(request);
+        var result = await _mediator.Send(command);
         if (!result.Success)
             return Conflict(result);
 
@@ -55,9 +60,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("create")]
-    public async Task<IActionResult> CreateStaffAccount([FromBody] RegisterRequest request)
+    public async Task<IActionResult> CreateStaffAccount([FromBody] CreateAccountCommand command)
     {
-        var result = await _authService.CreateAccountAsync(request);
+        var result = await _mediator.Send(command);
         if (!result.Success)
             return Conflict(result);
 
@@ -87,7 +92,7 @@ public class AuthController : ControllerBase
     {
         var userIdString = User.FindFirst("sub")?.Value;
         var result = await _authService.ChangePasswordAsync(userIdString, request);
-        
+
         if (!result.Success)
             return BadRequest(result);
 

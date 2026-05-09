@@ -23,7 +23,6 @@ public class AuthServiceTests
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
     private readonly IConfiguration _configuration;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
-    private readonly Mock<MassTransit.IPublishEndpoint> _mockPublishEndpoint;
     
     private readonly AuthService _authService;
 
@@ -43,7 +42,6 @@ public class AuthServiceTests
             })
             .Build();
         _mockLogger = new Mock<ILogger<AuthService>>();
-        _mockPublishEndpoint = new Mock<MassTransit.IPublishEndpoint>();
 
         _authService = new AuthService(
             _mockAccountRepository.Object,
@@ -54,8 +52,7 @@ public class AuthServiceTests
             _mockPermissionService.Object,
             _mockPasswordHasher.Object,
             _configuration,
-            _mockLogger.Object,
-            _mockPublishEndpoint.Object);
+            _mockLogger.Object);
     }
 
     [Fact]

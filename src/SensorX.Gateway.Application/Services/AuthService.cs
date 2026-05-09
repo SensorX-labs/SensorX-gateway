@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SensorX.Gateway.Application.Commons.Responses;
@@ -8,47 +7,21 @@ using SensorX.Gateway.Domain.Entities;
 using SensorX.Gateway.Domain.Enums;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
-using SensorX.Gateway.Domain.Events;
 
 namespace SensorX.Gateway.Application.Services;
 
-public class AuthService : IAuthService
+public class AuthService(
+    IAccountRepository _accountRepository,
+    IUnitOfWork _unitOfWork,
+    IJwtService _jwtService,
+    IAccessTokenService _accessTokenService,
+    IRefreshTokenService _refreshTokenService,
+    IRedisPermissionService _permissionService,
+    IPasswordHasher _passwordHasher,
+    IConfiguration _configuration,
+    ILogger<AuthService> _logger
+) : IAuthService
 {
-    private readonly IAccountRepository _accountRepository;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IJwtService _jwtService;
-    private readonly IAccessTokenService _accessTokenService;
-    private readonly IRefreshTokenService _refreshTokenService;
-    private readonly IRedisPermissionService _permissionService;
-    private readonly IPasswordHasher _passwordHasher;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<AuthService> _logger;
-    private readonly IPublishEndpoint _publishEndpoint;
-
-    public AuthService(
-        IAccountRepository accountRepository,
-        IUnitOfWork unitOfWork,
-        IJwtService jwtService,
-        IAccessTokenService accessTokenService,
-        IRefreshTokenService refreshTokenService,
-        IRedisPermissionService permissionService,
-        IPasswordHasher passwordHasher,
-        IConfiguration configuration,
-        ILogger<AuthService> logger,
-        IPublishEndpoint publishEndpoint)
-    {
-        _accountRepository = accountRepository;
-        _unitOfWork = unitOfWork;
-        _jwtService = jwtService;
-        _accessTokenService = accessTokenService;
-        _refreshTokenService = refreshTokenService;
-        _permissionService = permissionService;
-        _passwordHasher = passwordHasher;
-        _configuration = configuration;
-        _logger = logger;
-        _publishEndpoint = publishEndpoint;
-    }
-
     public async Task<ApiResponse<TokenPairResponse>> LoginAsync(LoginRequest request)
     {
         var account = await _accountRepository.GetByEmailAsync(request.Email);
@@ -70,9 +43,9 @@ public class AuthService : IAuthService
         {
             var maxAttempts = _configuration.GetValue<int>("Security:MaxLoginAttempts", 5);
             var lockoutMinutes = 15 * (int)Math.Pow(2, account.LockCount);
-            
+
             account.RecordFailedLogin(maxAttempts, lockoutMinutes);
-            
+
             if (account.IsLocked)
             {
                 _logger.LogWarning("Account locked for {Email} after {Attempts} failed attempts", account.Email, account.LoginFailCount);
@@ -125,63 +98,6 @@ public class AuthService : IAuthService
         return ApiResponse.SuccessResponse("Logged out");
     }
 
-    public async Task<ApiResponse<object>> RegisterAsync(RegisterRequest request)
-    {
-        if (await _accountRepository.AnyByEmailAsync(request.Email))
-            return ApiResponse<object>.FailResponse("Email already registered");
-
-        var passwordHash = await _passwordHasher.HashAsync(request.Password);
-        
-        // Split email for a preliminary FullName
-        var generatedFullName = request.Email.Split('@')[0];
-        
-        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.Customer);
-        
-        _accountRepository.Add(account);
-
-        await _unitOfWork.SaveChangesAsync();
-
-        // Bắn sự kiện ra RabbitMQ
-        await _publishEndpoint.Publish(new AccountRegisteredEvent
-        {
-            AccountId = account.Id,
-            Email = account.Email,
-            FullName = account.FullName,
-            AccountType = "customer",
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
-
-        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account registered");
-    }
-
-    public async Task<ApiResponse<object>> CreateAccountAsync(RegisterRequest request)
-    {
-        if (await _accountRepository.AnyByEmailAsync(request.Email))
-            return ApiResponse<object>.FailResponse("Email already exists");
-
-        var passwordHash = await _passwordHasher.HashAsync(request.Password);
-        
-        // Split email for a preliminary FullName
-        var generatedFullName = request.Email.Split('@')[0];
-        
-        var account = Account.Create(request.Email, generatedFullName, passwordHash, Role.SaleStaff);
-        
-        _accountRepository.Add(account);
-
-        await _unitOfWork.SaveChangesAsync();
-
-        // Bắn sự kiện ra RabbitMQ
-        await _publishEndpoint.Publish(new AccountRegisteredEvent
-        {
-            AccountId = account.Id,
-            Email = account.Email,
-            FullName = account.FullName,
-            AccountType = "staff",
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
-
-        return ApiResponse<object>.SuccessResponse(new { userId = account.Id }, "Account created");
-    }
 
     public ApiResponse<IntrospectResponse> Introspect(IntrospectRequest request)
     {
@@ -270,7 +186,7 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
 
         var status = account.IsLocked ? "locked" : "unlocked";
-        _logger.LogInformation("Account {Email} ({AccountId}) has been {Status}", 
+        _logger.LogInformation("Account {Email} ({AccountId}) has been {Status}",
             account.Email, account.Id, status);
 
         return ApiResponse.SuccessResponse($"Account {status} successfully");
@@ -280,7 +196,7 @@ public class AuthService : IAuthService
     {
         var roleStr = account.Role.ToString();
         var roles = new List<string> { roleStr };
-        
+
         account.ResetLoginFailures();
         await _unitOfWork.SaveChangesAsync();
 
