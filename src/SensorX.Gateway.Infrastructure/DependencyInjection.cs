@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IAccessTokenService, AccessTokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<DbSeeder>();
 
         // ── Memory cache (for claims enrichment) ──
         services.AddMemoryCache();
