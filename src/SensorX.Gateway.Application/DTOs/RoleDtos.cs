@@ -3,7 +3,7 @@ using SensorX.Gateway.Domain.Enums;
 namespace SensorX.Gateway.Application.DTOs;
 
 // ── Role Requests ──
-public record AssignRoleRequest(Guid UserId, Role Role);
+public record AssignRoleRequest(Guid UserId, Role Role, Guid? WarehouseId = null);
 
 // ── Role Responses ──
 public record RoleResponse(int Id, string Name);

@@ -12,7 +12,7 @@ public record ChangePasswordRequest(string OldPassword, string NewPassword);
 
 // ── Auth Responses ──
 public record TokenPairResponse(string AccessToken, string RefreshToken, UserInfoResponse User);
-public record UserInfoResponse(Guid Id, string Email, List<string> Roles);
+public record UserInfoResponse(Guid Id, string Email, List<string> Roles, Guid? WarehouseId = null);
 public record MfaChallengeResponse(bool MfaRequired, string MfaToken);
 public record IntrospectResponse(bool Active, string? Sub = null, string? Scope = null, string? Exp = null);
-public record UserResponse(Guid Id, string Email, string FullName, string Role, bool IsLocked, DateTimeOffset CreatedAt);
+public record UserResponse(Guid Id, string Email, string FullName, string Role, bool IsLocked, DateTimeOffset CreatedAt, Guid? WarehouseId = null);

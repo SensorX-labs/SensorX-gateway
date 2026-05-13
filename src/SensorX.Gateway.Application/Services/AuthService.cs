@@ -74,9 +74,9 @@ public class AuthService(
 
             var accessToken = _accessTokenService.CreateToken(
                 account.Id, account.Email,
-                roleStr, roleStr);
+                roleStr, roleStr, account.WarehouseId);
 
-            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles));
+            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles, account.WarehouseId));
             return ApiResponse<TokenPairResponse>.SuccessResponse(result);
         }
         catch (InvalidOperationException ex)
@@ -172,7 +172,8 @@ public class AuthService(
             a.FullName,
             a.Role.ToString(),
             a.IsLocked,
-            a.CreatedAt));
+            a.CreatedAt,
+            a.WarehouseId));
         return ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(users);
     }
 
@@ -204,11 +205,11 @@ public class AuthService(
 
         var accessToken = _accessTokenService.CreateToken(
             account.Id, account.Email,
-            roleStr, roleStr);
+            roleStr, roleStr, account.WarehouseId);
 
         var refreshToken = await _refreshTokenService.CreateAsync(account.Id);
 
         return new TokenPairResponse(accessToken, refreshToken,
-            new UserInfoResponse(account.Id, account.Email, roles));
+            new UserInfoResponse(account.Id, account.Email, roles, account.WarehouseId));
     }
 }
