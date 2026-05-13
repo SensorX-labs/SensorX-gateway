@@ -165,22 +165,34 @@ var app = builder.Build();
 //  Middleware Pipeline 
 // ═══════════════════════════════════════════════════════════════
 
+// ── Database Initialization & Seeding ──
+try
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        await db.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        // In production, we usually run migrations instead of EnsureCreated
+        // await db.Database.MigrateAsync();
+    }
+
+    var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+    await seeder.SeedAsync();
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "Could not initialize or seed database. Ensure the database is running.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseOpenApi();
     app.UseSwaggerUi();
-
-
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.EnsureCreatedAsync();
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "Could not create database schema. Ensure the database is running.");
-    }
 }
 
 
