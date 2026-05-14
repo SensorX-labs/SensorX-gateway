@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -181,6 +183,18 @@ if (app.Environment.IsDevelopment())
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Accounts.AnyAsync())
+        {
+            var hasher = scope.ServiceProvider.GetRequiredService<SensorX.Gateway.Domain.Interfaces.IPasswordHasher>();
+            var defaultHash = await hasher.HashAsync("admin123");
+            db.Accounts.Add(Account.Create("admin@sensorx.com", "Quản trị viên", defaultHash, Role.Admin));
+            db.Accounts.Add(Account.Create("manager@sensorx.com", "Quản lý hệ thống", defaultHash, Role.Manager));
+            db.Accounts.Add(Account.Create("staff@sensorx.com", "Nhân viên bán hàng", defaultHash, Role.SaleStaff));
+            db.Accounts.Add(Account.Create("warehouse@sensorx.com", "Thủ kho", defaultHash, Role.WarehouseStaff));
+            await db.SaveChangesAsync();
+            Log.Information("Đã khởi tạo thành công các tài khoản mặc định (mật khẩu: admin123).");
+        }
     }
     catch (Exception ex)
     {
