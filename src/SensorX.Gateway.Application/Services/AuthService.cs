@@ -74,9 +74,9 @@ public class AuthService(
 
             var accessToken = _accessTokenService.CreateToken(
                 account.Id, account.Email,
-                roleStr, roleStr);
+                roleStr, roleStr, account.WarehouseId);
 
-            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles));
+            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles, account.WarehouseId));
             return ApiResponse<TokenPairResponse>.SuccessResponse(result);
         }
         catch (InvalidOperationException ex)
@@ -127,21 +127,40 @@ public class AuthService(
     public async Task<ApiResponse> ChangePasswordAsync(string? userIdString, ChangePasswordRequest request)
     {
         if (userIdString == null || !Guid.TryParse(userIdString, out var accountId))
-            return ApiResponse.FailResponse("Unauthorized");
+            return ApiResponse.FailResponse("Bạn chưa đăng nhập hoặc phiên không hợp lệ.");
 
         var account = await _accountRepository.GetByIdAsync(accountId);
         if (account == null)
-            return ApiResponse.FailResponse("Unauthorized");
+            return ApiResponse.FailResponse("Tài khoản không tồn tại hoặc không hợp lệ.");
 
+        // Kiểm tra độ dài mật khẩu mới
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8 || request.NewPassword.Length > 64)
+            return ApiResponse.FailResponse("Mật khẩu mới phải có độ dài từ 8-64 ký tự.");
+
+        // Kiểm tra trùng mật khẩu cũ
+        if (request.OldPassword == request.NewPassword)
+            return ApiResponse.FailResponse("Mật khẩu mới không được trùng mật khẩu cũ.");
+
+        // Kiểm tra old password
         if (!await _passwordHasher.VerifyAsync(request.OldPassword, account.PasswordHash))
-            return ApiResponse.FailResponse("Incorrect old password");
+            return ApiResponse.FailResponse("Mật khẩu cũ không chính xác.");
+
+        // Tùy chọn thêm: kiểm tra độ mạnh mật khẩu mới (chữ hoa, chữ thường, số, ký tự đặc biệt)
+        var hasUpper = request.NewPassword.Any(char.IsUpper);
+        var hasLower = request.NewPassword.Any(char.IsLower);
+        var hasDigit = request.NewPassword.Any(char.IsDigit);
+        var hasSymbol = request.NewPassword.Any(ch => !char.IsLetterOrDigit(ch));
+        if (!(hasUpper && hasLower && hasDigit && hasSymbol))
+            return ApiResponse.FailResponse("Mật khẩu mới phải chứa cả chữ hoa, chữ thường, số và ký tự đặc biệt.");
 
         var newPasswordHash = await _passwordHasher.HashAsync(request.NewPassword);
         account.ChangePassword(newPasswordHash);
 
         await _unitOfWork.SaveChangesAsync();
 
-        return ApiResponse.SuccessResponse("Password changed successfully");
+        // TODO: revoke all refresh tokens for this user (optionally)
+
+        return ApiResponse.SuccessResponse("Đổi mật khẩu thành công.");
     }
 
     public async Task<ApiResponse<IEnumerable<UserResponse>>> GetAllUsersAsync()
@@ -153,7 +172,8 @@ public class AuthService(
             a.FullName,
             a.Role.ToString(),
             a.IsLocked,
-            a.CreatedAt));
+            a.CreatedAt,
+            a.WarehouseId));
         return ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(users);
     }
 
@@ -185,11 +205,11 @@ public class AuthService(
 
         var accessToken = _accessTokenService.CreateToken(
             account.Id, account.Email,
-            roleStr, roleStr);
+            roleStr, roleStr, account.WarehouseId);
 
         var refreshToken = await _refreshTokenService.CreateAsync(account.Id);
 
         return new TokenPairResponse(accessToken, refreshToken,
-            new UserInfoResponse(account.Id, account.Email, roles));
+            new UserInfoResponse(account.Id, account.Email, roles, account.WarehouseId));
     }
 }

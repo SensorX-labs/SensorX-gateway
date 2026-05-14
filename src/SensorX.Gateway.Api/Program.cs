@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -88,6 +90,11 @@ builder.Services.AddCors(options =>
                 ?? ["https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000"])
             .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
             .AllowCredentials()
+            .AllowAnyHeader()));
+builder.Services.AddCors(options =>
+    options.AddPolicy("Development", policy =>
+        policy.AllowAnyOrigin()
+            .AllowAnyMethod()
             .AllowAnyHeader()));
 
 // ── ForwardedHeaders (behind Nginx) ──
@@ -176,6 +183,18 @@ if (app.Environment.IsDevelopment())
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Accounts.AnyAsync())
+        {
+            var hasher = scope.ServiceProvider.GetRequiredService<SensorX.Gateway.Domain.Interfaces.IPasswordHasher>();
+            var defaultHash = await hasher.HashAsync("admin123");
+            db.Accounts.Add(Account.Create("admin@sensorx.com", "Quản trị viên", defaultHash, Role.Admin));
+            db.Accounts.Add(Account.Create("manager@sensorx.com", "Quản lý hệ thống", defaultHash, Role.Manager));
+            db.Accounts.Add(Account.Create("staff@sensorx.com", "Nhân viên bán hàng", defaultHash, Role.SaleStaff));
+            db.Accounts.Add(Account.Create("warehouse@sensorx.com", "Thủ kho", defaultHash, Role.WarehouseStaff));
+            await db.SaveChangesAsync();
+            Log.Information("Đã khởi tạo thành công các tài khoản mặc định (mật khẩu: admin123).");
+        }
     }
     catch (Exception ex)
     {
@@ -187,7 +206,7 @@ if (app.Environment.IsDevelopment())
 app.UseForwardedHeaders();          // [1] Resolve real IP from Nginx
 app.UseExceptionHandling();         // [2] Catch all exceptions → standard error
 app.UseSecurityHeaders();           // [3] HSTS, CSP, X-Frame-Options
-app.UseCors("Production");          // [4] CORS check before auth
+app.UseCors("Development");          // [4] CORS check before auth
 app.UseAuthentication();            // [5] Validate JWT signature + claims
 app.UseAuthorization();             // [6] Check role/scope → 403 if denied
 app.UseCorrelationId();             // [7] Inject X-Correlation-Id

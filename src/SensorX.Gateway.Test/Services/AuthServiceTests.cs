@@ -64,7 +64,7 @@ public class AuthServiceTests
 
         _mockAccountRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(account);
         _mockPasswordHasher.Setup(x => x.VerifyAsync("pass123", "hash")).ReturnsAsync(true);
-        _mockAccessTokenService.Setup(x => x.CreateToken(account.Id, email, "SaleStaff", "SaleStaff")).Returns("access_token");
+        _mockAccessTokenService.Setup(x => x.CreateToken(account.Id, email, "SaleStaff", "SaleStaff", It.IsAny<Guid?>())).Returns("access_token");
         _mockRefreshTokenService.Setup(x => x.CreateAsync(account.Id, 30)).ReturnsAsync("refresh_token");
 
         var result = await _authService.LoginAsync(request);
