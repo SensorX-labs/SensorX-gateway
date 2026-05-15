@@ -95,7 +95,7 @@ public class AuthService(
             await _permissionService.RemovePermissionsAsync(accountId);
         }
 
-        return ApiResponse.SuccessResponse("Logged out");
+        return ApiResponse.SuccessResponse("Đã đăng xuất thành công");
     }
 
 

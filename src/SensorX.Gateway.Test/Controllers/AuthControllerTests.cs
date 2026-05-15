@@ -81,7 +81,7 @@ namespace SensorX.Gateway.Test.Controllers
             
             var request = new LogoutRequest("refresh-token");
             _mockAuthService.Setup(x => x.LogoutAsync("userId", request))
-                .ReturnsAsync(ApiResponse.SuccessResponse("Logged out"));
+                .ReturnsAsync(ApiResponse.SuccessResponse("Đã đăng xuất thành công"));
 
             var result = await _controller.Logout(request);
             result.Should().BeOfType<OkObjectResult>();
