@@ -76,7 +76,7 @@ public class AuthService(
                 account.Id, account.Email,
                 roleStr, roleStr);
 
-            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles));
+            var result = new TokenPairResponse(accessToken, newRawToken, new UserInfoResponse(account.Id, account.Email, roles, account.FullName, account.AvatarUrl));
             return ApiResponse<TokenPairResponse>.SuccessResponse(result);
         }
         catch (InvalidOperationException ex)
@@ -151,6 +151,7 @@ public class AuthService(
             a.Id,
             a.Email,
             a.FullName,
+            a.AvatarUrl,
             a.Role.ToString(),
             a.IsLocked,
             a.CreatedAt));
@@ -173,6 +174,18 @@ public class AuthService(
         return ApiResponse.SuccessResponse($"Account {status} successfully");
     }
 
+    public async Task<ApiResponse> UpdateAvatarAsync(Guid accountId, string avatarUrl)
+    {
+        var account = await _accountRepository.GetByIdAsync(accountId);
+        if (account == null)
+            return ApiResponse.FailResponse("Account not found");
+
+        account.UpdateProfile(account.FullName, avatarUrl);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse.SuccessResponse("Avatar updated successfully");
+    }
+
     private async Task<TokenPairResponse> IssueTokenPairAsync(Account account)
     {
         var roleStr = account.Role.ToString();
@@ -190,6 +203,6 @@ public class AuthService(
         var refreshToken = await _refreshTokenService.CreateAsync(account.Id);
 
         return new TokenPairResponse(accessToken, refreshToken,
-            new UserInfoResponse(account.Id, account.Email, roles));
+            new UserInfoResponse(account.Id, account.Email, roles, account.FullName, account.AvatarUrl));
     }
 }
