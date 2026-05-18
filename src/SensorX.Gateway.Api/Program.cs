@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using SensorX.Gateway.Domain.Entities;
+using SensorX.Gateway.Domain.Enums;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -88,6 +90,11 @@ builder.Services.AddCors(options =>
                 ?? ["https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000"])
             .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
             .AllowCredentials()
+            .AllowAnyHeader()));
+builder.Services.AddCors(options =>
+    options.AddPolicy("Development", policy =>
+        policy.AllowAnyOrigin()
+            .AllowAnyMethod()
             .AllowAnyHeader()));
 
 // ── ForwardedHeaders (behind Nginx) ──
@@ -193,13 +200,14 @@ if (app.Environment.IsDevelopment())
 {
     app.UseOpenApi();
     app.UseSwaggerUi();
+
 }
 
 
 app.UseForwardedHeaders();          // [1] Resolve real IP from Nginx
 app.UseExceptionHandling();         // [2] Catch all exceptions → standard error
 app.UseSecurityHeaders();           // [3] HSTS, CSP, X-Frame-Options
-app.UseCors("Production");          // [4] CORS check before auth
+app.UseCors("Development");          // [4] CORS check before auth
 app.UseAuthentication();            // [5] Validate JWT signature + claims
 app.UseAuthorization();             // [6] Check role/scope → 403 if denied
 app.UseCorrelationId();             // [7] Inject X-Correlation-Id

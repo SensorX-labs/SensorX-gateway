@@ -34,7 +34,10 @@ public sealed class CreateAccountHandler(
         if (request.Role == Role.Admin)
             return ApiResponse<object>.FailResponse("Admin role is not allowed for staff creation");
 
-        var account = Account.Create(request.Email, generatedFullName, passwordHash, request.Role);
+        if (request.Role == Role.WarehouseStaff && !request.WarehouseId.HasValue)
+            return ApiResponse<object>.FailResponse("Vui lòng chọn kho bãi cho nhân viên kho");
+
+        var account = Account.Create(request.Email, generatedFullName, passwordHash, request.Role, request.WarehouseId);
 
         _accountRepository.Add(account);
 
@@ -45,6 +48,7 @@ public sealed class CreateAccountHandler(
             Email = account.Email,
             FullName = account.FullName,
             Role = account.Role,
+            WarehouseId = account.WarehouseId,
             RegisteredAt = DateTimeOffset.UtcNow
         }, cancellationToken);
 

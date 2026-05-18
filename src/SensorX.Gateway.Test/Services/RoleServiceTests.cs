@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SensorX.Gateway.Application.DTOs;
@@ -14,6 +15,7 @@ public class RoleServiceTests
 {
     private readonly Mock<IAccountRepository> _mockAccountRepository;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
     private readonly Mock<ILogger<RoleService>> _mockLogger;
     private readonly RoleService _roleService;
 
@@ -21,10 +23,12 @@ public class RoleServiceTests
     {
         _mockAccountRepository = new Mock<IAccountRepository>();
         _mockUnitOfWork = new Mock<IUnitOfWork>();
+        _mockPublishEndpoint = new Mock<IPublishEndpoint>();
         _mockLogger = new Mock<ILogger<RoleService>>();
         _roleService = new RoleService(
             _mockAccountRepository.Object,
             _mockUnitOfWork.Object,
+            _mockPublishEndpoint.Object,
             _mockLogger.Object);
     }
 

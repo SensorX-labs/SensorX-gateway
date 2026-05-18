@@ -19,6 +19,7 @@ public class Account : AggregateRoot<Guid>
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public Role Role { get; private set; }
+    public Guid? WarehouseId { get; private set; }
 
     // Navigation
     private readonly List<RefreshToken> _refreshTokens = new();
@@ -29,19 +30,20 @@ public class Account : AggregateRoot<Guid>
     {
     }
 
-    private Account(string email, string fullName, string passwordHash, Role role = Role.SaleStaff) : base(Guid.NewGuid())
+    private Account(string email, string fullName, string passwordHash, Role role = Role.SaleStaff, Guid? warehouseId = null) : base(Guid.NewGuid())
     {
         Email = email;
         FullName = fullName;
         PasswordHash = passwordHash;
         Role = role;
+        WarehouseId = warehouseId;
         CreatedAt = DateTimeOffset.UtcNow;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public static Account Create(string email, string fullName, string passwordHash, Role role = Role.SaleStaff)
+    public static Account Create(string email, string fullName, string passwordHash, Role role = Role.SaleStaff, Guid? warehouseId = null)
     {
-        return new Account(email, fullName, passwordHash, role);
+        return new Account(email, fullName, passwordHash, role, warehouseId);
     }
 
     public void UpdateProfile(string fullName, string? avatarUrl)
@@ -79,11 +81,12 @@ public class Account : AggregateRoot<Guid>
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public void SetRole(Role role)
+    public void SetRole(Role role, Guid? warehouseId = null)
     {
-        if (Role != role)
+        if (Role != role || WarehouseId != warehouseId)
         {
             Role = role;
+            WarehouseId = warehouseId;
             UpdatedAt = DateTimeOffset.UtcNow;
         }
     }

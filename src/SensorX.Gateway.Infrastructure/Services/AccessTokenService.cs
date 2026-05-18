@@ -13,7 +13,7 @@ public class AccessTokenService : IAccessTokenService
         _jwtService = jwtService;
     }
 
-    public string CreateToken(Guid userId, string email, string role, string scope)
+    public string CreateToken(Guid userId, string email, string role, string scope, Guid? warehouseId = null)
     {
         var username = email.Split('@')[0];
         var claims = new List<Claim>
@@ -25,6 +25,10 @@ public class AccessTokenService : IAccessTokenService
             new("role", role),
             new("scope", scope)
         };
+        if (warehouseId.HasValue)
+        {
+            claims.Add(new Claim("warehouse_id", warehouseId.Value.ToString()));
+        }
         return _jwtService.Sign(claims);
     }
 }

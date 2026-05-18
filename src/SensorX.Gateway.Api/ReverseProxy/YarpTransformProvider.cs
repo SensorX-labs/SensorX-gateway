@@ -19,9 +19,20 @@ public static class YarpTransformProvider
                         .TryAddWithoutValidation("X-User-Id",
                             user.FindFirst("sub")?.Value ?? "");
 
+                    var role = user.FindFirst("role")?.Value ?? "";
                     transform.ProxyRequest.Headers
-                        .TryAddWithoutValidation("X-User-Roles",
-                            user.FindFirst("role")?.Value ?? "");
+                        .TryAddWithoutValidation("X-User-Roles", role);
+
+                    if (role == "WarehouseStaff")
+                    {
+                        var warehouseIdFromToken = user.FindFirst("warehouse_id")?.Value;
+                        if (!string.IsNullOrEmpty(warehouseIdFromToken))
+                        {
+                            transform.ProxyRequest.Headers.Remove("X-Warehouse-Id");
+                            transform.ProxyRequest.Headers
+                                .TryAddWithoutValidation("X-Warehouse-Id", warehouseIdFromToken);
+                        }
+                    }
                 }
 
                 // Always forward Correlation ID
