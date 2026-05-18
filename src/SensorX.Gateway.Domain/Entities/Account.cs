@@ -99,6 +99,26 @@ public class Account : AggregateRoot<Guid>
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void LockAccount()
+    {
+        if (!IsLocked)
+        {
+            IsLocked = true;
+            UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void UnlockAccount()
+    {
+        if (IsLocked)
+        {
+            IsLocked = false;
+            LockedUntil = null;
+            LoginFailCount = 0;
+            UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
     public void RemoveAllRefreshTokens()
     {
         _refreshTokens.Clear();
