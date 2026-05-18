@@ -61,7 +61,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=sensorx_gateway;Username=postgres;Password=${POSTGRES_PASSWORD}
-      - Redis__ConnectionString=redis:6379
+      - Redis__ConnectionString=redis:6379,password=redis123
       - JwtSettings__Issuer=https://api.${DOMAIN}
       - JwtSettings__Audience=api
       - JwtSettings__PrivateKeyPath=/run/secrets/jwt_private_key
