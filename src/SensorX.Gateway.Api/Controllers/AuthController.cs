@@ -117,4 +117,16 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
+
+    [Authorize]
+    [HttpPut("update-avatar")]
+    public async Task<IActionResult> UpdateAvatar([FromBody] string avatarUrl)
+    {
+        var userIdString = User.FindFirst("sub")?.Value;
+        if (userIdString == null || !Guid.TryParse(userIdString, out var accountId))
+            return Unauthorized();
+
+        var result = await _authService.UpdateAvatarAsync(accountId, avatarUrl);
+        return Ok(result);
+    }
 }

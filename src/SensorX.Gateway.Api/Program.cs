@@ -172,34 +172,35 @@ var app = builder.Build();
 //  Middleware Pipeline 
 // ═══════════════════════════════════════════════════════════════
 
+// ── Database Initialization & Seeding ──
+try
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        await db.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        // In production, we usually run migrations instead of EnsureCreated
+        // await db.Database.MigrateAsync();
+    }
+
+    var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+    await seeder.SeedAsync();
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "Could not initialize or seed database. Ensure the database is running.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseOpenApi();
     app.UseSwaggerUi();
 
-
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.EnsureCreatedAsync();
-
-        if (!await db.Accounts.AnyAsync())
-        {
-            var hasher = scope.ServiceProvider.GetRequiredService<SensorX.Gateway.Domain.Interfaces.IPasswordHasher>();
-            var defaultHash = await hasher.HashAsync("admin123");
-            db.Accounts.Add(Account.Create("admin@sensorx.com", "Quản trị viên", defaultHash, Role.Admin));
-            db.Accounts.Add(Account.Create("manager@sensorx.com", "Quản lý hệ thống", defaultHash, Role.Manager));
-            db.Accounts.Add(Account.Create("staff@sensorx.com", "Nhân viên bán hàng", defaultHash, Role.SaleStaff));
-            db.Accounts.Add(Account.Create("warehouse@sensorx.com", "Thủ kho", defaultHash, Role.WarehouseStaff));
-            await db.SaveChangesAsync();
-            Log.Information("Đã khởi tạo thành công các tài khoản mặc định (mật khẩu: admin123).");
-        }
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "Could not create database schema. Ensure the database is running.");
-    }
 }
 
 
