@@ -5,6 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Application.Services;
+using SensorX.Gateway.Application.Events.Consumers.StaffStatusChanged;
+using SensorX.Gateway.Application.Events.Consumers.StaffUpdated;
+using SensorX.Gateway.Application.Events.Consumers.CustomerAvatarUpdated;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 using SensorX.Gateway.Infrastructure.Persistence;
@@ -44,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IAccessTokenService, AccessTokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<DbSeeder>();
 
         // ── Memory cache (for claims enrichment) ──
         services.AddMemoryCache();
@@ -51,6 +55,12 @@ public static class DependencyInjection
         // ── RabbitMQ / MassTransit ──
         services.AddMassTransit(x =>
         {
+            // Đăng ký Consumer
+            x.AddConsumer<StaffStatusChangedConsumer>();
+            x.AddConsumer<StaffUpdatedConsumer>();
+            x.AddConsumer<CustomerAvatarUpdatedConsumer>();
+            x.AddConsumer<StaffAvatarUpdatedConsumer>();
+
             // Đăng ký Entity Framework Outbox
             x.AddEntityFrameworkOutbox<AppDbContext>(o =>
             {
