@@ -28,8 +28,13 @@ public static class DependencyInjection
 
         // ── Redis ──
         var redisConnectionString = configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
+        var redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+        redisOptions.AbortOnConnectFail = false;
+        redisOptions.ConnectRetry = 3;
+        redisOptions.ConnectTimeout = 5000;
+        
         services.AddSingleton<IConnectionMultiplexer>(
-            ConnectionMultiplexer.Connect(redisConnectionString));
+            ConnectionMultiplexer.Connect(redisOptions));
 
 
         // ── Domain services ──
