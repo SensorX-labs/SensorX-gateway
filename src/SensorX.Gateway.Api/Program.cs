@@ -83,19 +83,21 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler
 builder.Services.AddAuthorization();
 
 // ── CORS ──
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000"];
+
 builder.Services.AddCors(options =>
     options.AddPolicy("Production", policy =>
-        policy.WithOrigins(
-                builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                ?? ["https://app.yourdomain.com", "https://admin.yourdomain.com", "http://localhost:3000"])
+        policy.WithOrigins(allowedOrigins)
             .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
             .AllowCredentials()
             .AllowAnyHeader()));
 builder.Services.AddCors(options =>
     options.AddPolicy("Development", policy =>
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader()));
+            .AllowAnyHeader()
+            .AllowCredentials()));
 
 // ── ForwardedHeaders (behind Nginx) ──
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
