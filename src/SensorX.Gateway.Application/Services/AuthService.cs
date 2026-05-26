@@ -178,6 +178,71 @@ public class AuthService(
         return ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(users);
     }
 
+    public async Task<ApiResponse<PagedUserResponse>> GetPagedUsersAsync(GetUsersQuery request)
+    {
+        var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
+        var pageSize = request.PageSize <= 0 ? 10 : request.PageSize;
+        Role? role = Enum.TryParse<Role>(request.Role, true, out var parsedRole)
+            ? parsedRole
+            : null;
+
+        var (items, totalCount) = await _accountRepository.GetPagedAsync(
+            pageNumber,
+            pageSize,
+            request.SearchTerm,
+            request.Email,
+            request.FullName,
+            role,
+            request.IsLocked,
+            request.WarehouseId,
+            request.CreatedFrom,
+            request.CreatedTo
+        );
+
+        var users = items
+            .Select(a => new UserResponse(
+                a.Id,
+                a.Email,
+                a.FullName,
+                a.AvatarUrl,
+                a.Role.ToString(),
+                a.IsLocked,
+                a.CreatedAt,
+                a.WarehouseId))
+            .ToList();
+
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return ApiResponse<PagedUserResponse>.SuccessResponse(
+            new PagedUserResponse(
+                users,
+                pageNumber,
+                pageSize,
+                totalCount,
+                totalPages,
+                pageNumber < totalPages,
+                pageNumber > 1
+            )
+        );
+    }
+
+    public async Task<ApiResponse<UserStatsResponse>> GetUserStatsAsync()
+    {
+        var accounts = await _accountRepository.GetAllAsync();
+        var accountList = accounts.ToList();
+
+        var stats = new UserStatsResponse(
+            accountList.Count,
+            accountList.Count(account => !account.IsLocked),
+            accountList.Count(account => account.IsLocked),
+            accountList.Count(account => account.Role == Role.WarehouseStaff),
+            accountList.Count(account => account.Role == Role.SaleStaff),
+            accountList.Count(account => account.Role == Role.Manager)
+        );
+
+        return ApiResponse<UserStatsResponse>.SuccessResponse(stats);
+    }
+
     public async Task<ApiResponse> ToggleUserLockAsync(Guid userId)
     {
         var account = await _accountRepository.GetByIdAsync(userId);

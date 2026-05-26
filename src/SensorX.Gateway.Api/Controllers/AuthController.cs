@@ -108,6 +108,22 @@ public class AuthController : ControllerBase
     }
 
     [Authorize(Roles = "Manager,Admin")]
+    [HttpGet("users/list")]
+    public async Task<IActionResult> GetPagedUsers([FromQuery] GetUsersQuery query)
+    {
+        var result = await _authService.GetPagedUsersAsync(query);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Manager,Admin")]
+    [HttpGet("users/stats")]
+    public async Task<IActionResult> GetUserStats()
+    {
+        var result = await _authService.GetUserStatsAsync();
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost("users/{id}/toggle-lock")]
     public async Task<IActionResult> ToggleUserLock(Guid id)
     {
