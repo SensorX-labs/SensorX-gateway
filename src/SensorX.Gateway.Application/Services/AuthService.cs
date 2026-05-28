@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 using SensorX.Gateway.Application.Commons.Responses;
 using SensorX.Gateway.Application.DTOs;
 using SensorX.Gateway.Application.Interfaces;
@@ -18,6 +19,7 @@ public class AuthService(
     IRefreshTokenService _refreshTokenService,
     IRedisPermissionService _permissionService,
     IPasswordHasher _passwordHasher,
+    IEmailSender _emailSender,
     IConfiguration _configuration,
     ILogger<AuthService> _logger
 ) : IAuthService
@@ -122,6 +124,44 @@ public class AuthService(
             await _permissionService.RemovePermissionsAsync(accountId);
         }
         return ApiResponse.SuccessResponse("All tokens revoked");
+    }
+
+    public async Task<ApiResponse> ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return ApiResponse.FailResponse("Email is required.");
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var genericMessage = "Nếu email tồn tại, hệ thống đã gửi mật khẩu mới tới hộp thư của bạn.";
+        var account = await _accountRepository.GetByEmailAsync(normalizedEmail);
+
+        if (account == null)
+        {
+            _logger.LogInformation("Forgot password requested for non-existing email {Email}", normalizedEmail);
+            return ApiResponse.SuccessResponse(genericMessage);
+        }
+
+        var temporaryPassword = GenerateTemporaryPassword();
+
+        try
+        {
+            await _emailSender.SendAsync(
+                account.Email,
+                "SensorX - Mật khẩu tạm thời mới",
+                BuildForgotPasswordEmailBody(account.FullName, temporaryPassword));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send forgot password email to {Email}", account.Email);
+            return ApiResponse.FailResponse("Không thể gửi email lúc này. Vui lòng thử lại sau.");
+        }
+
+        var passwordHash = await _passwordHasher.HashAsync(temporaryPassword);
+        account.ChangePassword(passwordHash);
+        await _unitOfWork.SaveChangesAsync();
+        await _refreshTokenService.RevokeAllForUserAsync(account.Id);
+
+        return ApiResponse.SuccessResponse(genericMessage);
     }
 
     public async Task<ApiResponse> ChangePasswordAsync(string? userIdString, ChangePasswordRequest request)
@@ -289,5 +329,49 @@ public class AuthService(
 
         return new TokenPairResponse(accessToken, refreshToken,
             new UserInfoResponse(account.Id, account.Email, roles, account.FullName, account.AvatarUrl, account.WarehouseId));
+    }
+
+    private static string GenerateTemporaryPassword()
+    {
+        const string uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lowercase = "abcdefghijkmnopqrstuvwxyz";
+        const string digits = "23456789";
+        const string symbols = "!@#$%^&*";
+        var allChars = uppercase + lowercase + digits + symbols;
+
+        var passwordChars = new List<char>
+        {
+            uppercase[RandomNumberGenerator.GetInt32(uppercase.Length)],
+            lowercase[RandomNumberGenerator.GetInt32(lowercase.Length)],
+            digits[RandomNumberGenerator.GetInt32(digits.Length)],
+            symbols[RandomNumberGenerator.GetInt32(symbols.Length)]
+        };
+
+        for (var i = passwordChars.Count; i < 12; i++)
+        {
+            passwordChars.Add(allChars[RandomNumberGenerator.GetInt32(allChars.Length)]);
+        }
+
+        for (var i = passwordChars.Count - 1; i > 0; i--)
+        {
+            var swapIndex = RandomNumberGenerator.GetInt32(i + 1);
+            (passwordChars[i], passwordChars[swapIndex]) = (passwordChars[swapIndex], passwordChars[i]);
+        }
+
+        return new string(passwordChars.ToArray());
+    }
+
+    private static string BuildForgotPasswordEmailBody(string fullName, string temporaryPassword)
+    {
+        var displayName = string.IsNullOrWhiteSpace(fullName) ? "bạn" : fullName;
+
+        return $"""
+            <p>Xin chào {displayName},</p>
+            <p>Hệ thống SensorX đã tạo một mật khẩu tạm thời mới cho tài khoản của bạn.</p>
+            <p><strong>Mật khẩu mới:</strong> {temporaryPassword}</p>
+            <p>Vì lý do bảo mật, vui lòng đăng nhập và đổi mật khẩu ngay sau khi nhận được email này.</p>
+            <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng liên hệ quản trị viên hoặc bộ phận hỗ trợ ngay lập tức.</p>
+            <p>Trân trọng,<br/>SensorX</p>
+            """;
     }
 }

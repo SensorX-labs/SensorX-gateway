@@ -59,6 +59,17 @@ public class AuthController : ControllerBase
         return Created("", result);
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var result = await _authService.ForgotPasswordAsync(request);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
     [HttpPost("create")]
     public async Task<IActionResult> CreateStaffAccount([FromBody] CreateAccountCommand command)
     {

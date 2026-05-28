@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SensorX.Gateway.Application.DTOs;
+using SensorX.Gateway.Application.Interfaces;
 using SensorX.Gateway.Application.Services;
 using SensorX.Gateway.Domain.Entities;
 using SensorX.Gateway.Domain.Enums;
@@ -21,6 +22,7 @@ public class AuthServiceTests
     private readonly Mock<IRefreshTokenService> _mockRefreshTokenService;
     private readonly Mock<IRedisPermissionService> _mockPermissionService;
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
+    private readonly Mock<IEmailSender> _mockEmailSender;
     private readonly IConfiguration _configuration;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
     
@@ -35,6 +37,7 @@ public class AuthServiceTests
         _mockRefreshTokenService = new Mock<IRefreshTokenService>();
         _mockPermissionService = new Mock<IRedisPermissionService>();
         _mockPasswordHasher = new Mock<IPasswordHasher>();
+        _mockEmailSender = new Mock<IEmailSender>();
         _configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -51,6 +54,7 @@ public class AuthServiceTests
             _mockRefreshTokenService.Object,
             _mockPermissionService.Object,
             _mockPasswordHasher.Object,
+            _mockEmailSender.Object,
             _configuration,
             _mockLogger.Object);
     }

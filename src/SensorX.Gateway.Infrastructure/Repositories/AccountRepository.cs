@@ -17,8 +17,9 @@ public class AccountRepository : IAccountRepository
 
     public async Task<Account?> GetByEmailAsync(string email)
     {
+        var normalizedEmail = email.Trim().ToLower();
         return await _context.Accounts
-            .FirstOrDefaultAsync(u => u.Email == email);
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
     }
 
     public async Task<Account?> GetByIdAsync(Guid id)
@@ -29,7 +30,8 @@ public class AccountRepository : IAccountRepository
 
     public async Task<bool> AnyByEmailAsync(string email)
     {
-        return await _context.Accounts.AnyAsync(u => u.Email == email);
+        var normalizedEmail = email.Trim().ToLower();
+        return await _context.Accounts.AnyAsync(u => u.Email.ToLower() == normalizedEmail);
     }
 
     public async Task<IEnumerable<Account>> GetAllAsync()

@@ -8,6 +8,7 @@ public record RegisterRequest(string Email, string Password);
 public record MfaRequest(string MfaToken, string Code);
 public record IntrospectRequest(string Token);
 public record RevokeRequest();
+public record ForgotPasswordRequest(string Email);
 public record ChangePasswordRequest(string OldPassword, string NewPassword);
 
 // ── Auth Responses ──
