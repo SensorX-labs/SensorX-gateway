@@ -5,6 +5,7 @@
     <RootNamespace>SensorX.Gateway</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>sensorx-gateway-local</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
