@@ -51,6 +51,7 @@ public static class DependencyInjection
         // ── Application services ──
         services.AddScoped<IAccessTokenService, AccessTokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<DbSeeder>();
 

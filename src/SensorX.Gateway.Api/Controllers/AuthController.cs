@@ -59,6 +59,17 @@ public class AuthController : ControllerBase
         return Created("", result);
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var result = await _authService.ForgotPasswordAsync(request);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
     [HttpPost("create")]
     public async Task<IActionResult> CreateStaffAccount([FromBody] CreateAccountCommand command)
     {
@@ -104,6 +115,22 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> GetAllUsers()
     {
         var result = await _authService.GetAllUsersAsync();
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Manager,Admin")]
+    [HttpGet("users/list")]
+    public async Task<IActionResult> GetPagedUsers([FromQuery] GetUsersQuery query)
+    {
+        var result = await _authService.GetPagedUsersAsync(query);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Manager,Admin")]
+    [HttpGet("users/stats")]
+    public async Task<IActionResult> GetUserStats()
+    {
+        var result = await _authService.GetUserStatsAsync();
         return Ok(result);
     }
 
