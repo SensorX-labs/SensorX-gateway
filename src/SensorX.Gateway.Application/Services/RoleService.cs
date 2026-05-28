@@ -67,7 +67,6 @@ public class RoleService : IRoleService
             Email = account.Email,
             FullName = account.FullName,
             Role = account.Role,
-            WarehouseId = account.WarehouseId,
             RegisteredAt = account.CreatedAt
         });
 
@@ -78,4 +77,4 @@ public class RoleService : IRoleService
 
         return ApiResponse.SuccessResponse("Role assigned to user successfully");
     }
-}
+}

@@ -48,7 +48,6 @@ public sealed class CreateAccountHandler(
             Email = account.Email,
             FullName = account.FullName,
             Role = account.Role,
-            WarehouseId = account.WarehouseId,
             RegisteredAt = DateTimeOffset.UtcNow
         }, cancellationToken);
 
