@@ -210,8 +210,43 @@ app.UseForwardedHeaders();          // [1] Resolve real IP from Nginx
 app.UseExceptionHandling();         // [2] Catch all exceptions → standard error
 app.UseSecurityHeaders();           // [3] HSTS, CSP, X-Frame-Options
 app.UseCors("Development");          // [4] CORS check before auth
+
+// Pre-routing: Override X-Warehouse-Id header from JWT token for WarehouseStaff so YARP routes correctly
+app.Use(async (context, next) =>
+{
+    var authHeader = context.Request.Headers["Authorization"].ToString();
+    if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        var tokenStr = authHeader.Substring("Bearer ".Length).Trim();
+        try
+        {
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            if (handler.CanReadToken(tokenStr))
+            {
+                var jwtToken = handler.ReadJwtToken(tokenStr);
+                var roleClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+                if (roleClaim == "WarehouseStaff")
+                {
+                    var warehouseIdFromToken = jwtToken.Claims.FirstOrDefault(c => c.Type == "warehouse_id")?.Value;
+                    if (!string.IsNullOrEmpty(warehouseIdFromToken))
+                    {
+                        context.Request.Headers["X-Warehouse-Id"] = warehouseIdFromToken;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore parsing errors, authentication middleware will handle validation later
+        }
+    }
+    await next();
+});
+
+app.UseRouting();
 app.UseAuthentication();            // [5] Validate JWT signature + claims
 app.UseAuthorization();             // [6] Check role/scope → 403 if denied
+
 app.UseCorrelationId();             // [7] Inject X-Correlation-Id
 
 
