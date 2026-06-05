@@ -182,12 +182,12 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        await db.Database.EnsureCreatedAsync();
+        await db.Database.MigrateAsync();
     }
     else
     {
-        // In production, we usually run migrations instead of EnsureCreated
-        // await db.Database.MigrateAsync();
+        // In production, run all pending migrations on startup
+        await db.Database.MigrateAsync();
     }
 
     var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
