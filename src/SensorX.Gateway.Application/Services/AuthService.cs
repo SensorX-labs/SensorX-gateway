@@ -28,7 +28,7 @@ public class AuthService(
     {
         var account = await _accountRepository.GetByEmailAsync(request.Email);
         if (account == null)
-            return ApiResponse<TokenPairResponse>.FailResponse("Invalid credentials");
+            return ApiResponse<TokenPairResponse>.FailResponse("Không tìm thấy tài khoản");
 
         if (account.IsLocked && account.LockedUntil > DateTimeOffset.UtcNow)
         {
@@ -53,7 +53,7 @@ public class AuthService(
                 _logger.LogWarning("Account locked for {Email} after {Attempts} failed attempts", account.Email, account.LoginFailCount);
             }
             await _unitOfWork.SaveChangesAsync();
-            return ApiResponse<TokenPairResponse>.FailResponse("Invalid credentials");
+            return ApiResponse<TokenPairResponse>.FailResponse("Sai mật khẩu");
         }
 
         var response = await IssueTokenPairAsync(account);
