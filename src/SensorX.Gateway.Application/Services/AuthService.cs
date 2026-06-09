@@ -32,7 +32,7 @@ public class AuthService(
 
         if (account.IsLocked && account.LockedUntil > DateTimeOffset.UtcNow)
         {
-            var msg = $"Account locked until {account.LockedUntil}";
+            var msg = $"Khóa tạm thời do nhập sai mật khẩu, sẽ mở vào lúc {account.LockedUntil}";
             return ApiResponse<TokenPairResponse>.FailResponse(msg);
         }
 
