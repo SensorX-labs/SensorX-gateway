@@ -7,5 +7,4 @@ public interface IRoleService
 {
     ApiResponse<IEnumerable<RoleResponse>> GetAllRoles();
     Task<ApiResponse<RoleResponse>> GetUserRoleAsync(Guid userId);
-    Task<ApiResponse> AssignRoleToUserAsync(AssignRoleRequest request);
 }

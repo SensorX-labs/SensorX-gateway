@@ -59,22 +59,4 @@ public class RoleServiceTests
         result.Data.Should().NotBeNull();
         result.Data!.Name.Should().Be("Admin");
     }
-
-    [Fact]
-    public async Task AssignRoleToUserAsync_WhenValidRequest_ShouldAssignRole()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var account = Account.Create("test@test.com", "Name", "hash", Role.WarehouseStaff);
-
-        _mockAccountRepository.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(account);
-
-        // Act
-        var result = await _roleService.AssignRoleToUserAsync(new AssignRoleRequest(userId, Role.SaleStaff));
-
-        // Assert
-        result.Success.Should().BeTrue();
-        account.Role.Should().Be(Role.SaleStaff);
-        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
 }

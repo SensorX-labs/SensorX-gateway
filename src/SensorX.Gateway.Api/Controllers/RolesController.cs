@@ -42,17 +42,4 @@ public class RolesController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Assign a role to a user (Manager/Admin only)
-    /// </summary>
-    [HttpPost("assign")]
-    [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> AssignRole([FromBody] AssignRoleRequest request)
-    {
-        var result = await _roleService.AssignRoleToUserAsync(request);
-        if (!result.Success)
-            return BadRequest(result);
-
-        return Ok(result);
-    }
 }
