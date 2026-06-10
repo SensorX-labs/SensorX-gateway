@@ -45,36 +45,4 @@ public class RoleService : IRoleService
         var role = account.Role;
         return ApiResponse<RoleResponse>.SuccessResponse(new RoleResponse((int)role, role.ToString()));
     }
-
-    public async Task<ApiResponse> AssignRoleToUserAsync(AssignRoleRequest request)
-    {
-        var account = await _accountRepository.GetByIdAsync(request.UserId);
-        if (account == null)
-            return ApiResponse.FailResponse("Account not found");
-
-        if (!Enum.IsDefined(typeof(Role), request.Role))
-            return ApiResponse.FailResponse("Invalid role");
-
-        if (request.Role == Role.WarehouseStaff && !request.WarehouseId.HasValue)
-            return ApiResponse.FailResponse("Vui lòng chọn kho bãi cho nhân viên kho");
-
-        account.SetRole(request.Role, request.WarehouseId);
-
-        // Bắn thông điệp đồng bộ sang dịch vụ Data
-        await _publishEndpoint.Publish(new CreateAccountEvent
-        {
-            AccountId = account.Id,
-            Email = account.Email,
-            FullName = account.FullName,
-            Role = account.Role,
-            RegisteredAt = account.CreatedAt
-        });
-
-        await _unitOfWork.SaveChangesAsync();
-
-        _logger.LogInformation("Role {Role} assigned to account {AccountEmail} ({AccountId}) with WarehouseId {WarehouseId}", 
-            request.Role, account.Email, account.Id, request.WarehouseId);
-
-        return ApiResponse.SuccessResponse("Role assigned to user successfully");
-    }
 }

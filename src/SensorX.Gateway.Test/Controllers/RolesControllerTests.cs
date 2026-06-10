@@ -63,30 +63,5 @@ namespace SensorX.Gateway.Test.Controllers
 
             result.Should().BeOfType<NotFoundObjectResult>();
         }
-
-        [Fact]
-        public async Task AssignRole_WhenSuccess_ShouldReturnOk()
-        {
-            var request = new AssignRoleRequest(Guid.NewGuid(), Role.SaleStaff);
-            _mockRoleService.Setup(x => x.AssignRoleToUserAsync(request))
-                .ReturnsAsync(ApiResponse.SuccessResponse("OK"));
-
-            var result = await _controller.AssignRole(request) as OkObjectResult;
-
-            result.Should().NotBeNull();
-            result!.StatusCode.Should().Be(200);
-        }
-
-        [Fact]
-        public async Task AssignRole_WhenFail_ShouldReturnBadRequest()
-        {
-            var request = new AssignRoleRequest(Guid.NewGuid(), Role.SaleStaff);
-            _mockRoleService.Setup(x => x.AssignRoleToUserAsync(request))
-                .ReturnsAsync(ApiResponse.FailResponse("Error"));
-
-            var result = await _controller.AssignRole(request);
-
-            result.Should().BeOfType<BadRequestObjectResult>();
-        }
     }
 }
