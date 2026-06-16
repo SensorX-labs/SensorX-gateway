@@ -8,6 +8,7 @@ using SensorX.Gateway.Application.Services;
 using SensorX.Gateway.Application.Events.Consumers.StaffStatusChanged;
 using SensorX.Gateway.Application.Events.Consumers.StaffUpdated;
 using SensorX.Gateway.Application.Events.Consumers.CustomerAvatarUpdated;
+using SensorX.Gateway.Application.Events.Consumers.SendEmail;
 using SensorX.Gateway.Domain.Interfaces;
 using SensorX.Gateway.Domain.Interfaces.Repositories;
 using SensorX.Gateway.Infrastructure.Persistence;
@@ -66,6 +67,7 @@ public static class DependencyInjection
             x.AddConsumer<StaffUpdatedConsumer>();
             x.AddConsumer<CustomerAvatarUpdatedConsumer>();
             x.AddConsumer<StaffAvatarUpdatedConsumer>();
+            x.AddConsumer<SendEmailConsumer>();
 
             // Đăng ký Entity Framework Outbox
             x.AddEntityFrameworkOutbox<AppDbContext>(o =>
@@ -95,6 +97,9 @@ public static class DependencyInjection
 
                 cfg.Message<SensorX.Gateway.Application.Commands.CustomerRegisterAccount.CustomerRegisterAccountEvent>(e =>
                     e.SetEntityName("customer-registered"));
+
+                cfg.Message<SendEmailCommand>(e =>
+                    e.SetEntityName("send-email-command"));
 
                 cfg.ConfigureEndpoints(context);
             });
