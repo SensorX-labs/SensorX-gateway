@@ -160,7 +160,7 @@ File cấu hình chính: `src/SensorX.Gateway.Api/appsettings.json`
   "JwtSettings": {
     "Issuer": "https://gateway.yourdomain.com",
     "Audience": "api",
-    "AccessTokenMinutes": 15,
+    "AccessTokenMinutes": 3600,
     "PrivateKeyPath": "Keys/private.key",
     "Kid": "key-2026-02",
     "HmacSecret": "CHANGE-THIS-IN-PRODUCTION"

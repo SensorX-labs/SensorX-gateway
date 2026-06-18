@@ -18,7 +18,7 @@ public class JwtServiceTests
             {
                 ["JwtSettings:Issuer"] = "https://test-issuer.com",
                 ["JwtSettings:Audience"] = "test-audience",
-                ["JwtSettings:AccessTokenMinutes"] = "15",
+                ["JwtSettings:AccessTokenMinutes"] = "3600",
                 ["JwtSettings:HmacSecret"] = "test-secret-key-must-be-long-enough-32-chars-long"
             })
             .Build();
