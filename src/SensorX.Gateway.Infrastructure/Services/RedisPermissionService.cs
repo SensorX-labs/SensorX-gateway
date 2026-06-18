@@ -13,7 +13,7 @@ public class RedisPermissionService : IRedisPermissionService
     public RedisPermissionService(IConnectionMultiplexer redis, IConfiguration configuration)
     {
         _redis = redis;
-        var ttlMinutes = configuration.GetValue("JwtSettings:AccessTokenMinutes", 15);
+        var ttlMinutes = configuration.GetValue("JwtSettings:AccessTokenMinutes", 3600);
         _defaultTtl = TimeSpan.FromMinutes(ttlMinutes);
     }
 

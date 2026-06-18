@@ -20,7 +20,7 @@ public class JwtService : IJwtService
         _secret = configuration["JwtSettings:HmacSecret"] ?? "fallback-secure-secret-key-that-is-long-enough";
         _issuer = configuration["JwtSettings:Issuer"] ?? "https://gateway.yourdomain.com";
         _audience = configuration["JwtSettings:Audience"] ?? "api";
-        _accessTokenMinutes = configuration.GetValue("JwtSettings:AccessTokenMinutes", 15);
+        _accessTokenMinutes = configuration.GetValue("JwtSettings:AccessTokenMinutes", 3600);
 
         _validationParameters = new TokenValidationParameters
         {
